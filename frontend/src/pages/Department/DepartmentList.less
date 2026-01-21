@@ -1,0 +1,37 @@
+.department-list-container {
+  padding: 24px;
+  background: #fff;
+
+  .toolbar {
+    margin-bottom: 16px;
+  }
+
+  .tree-container {
+    min-height: 400px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    padding: 16px;
+  }
+
+  .tree-node-title {
+    display: flex;
+    align-items: center;
+    width: 100%;
+
+    .tree-node-code {
+      color: #999;
+      margin-left: 8px;
+      font-size: 12px;
+    }
+
+    .tree-node-actions {
+      margin-left: auto;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    &:hover .tree-node-actions {
+      opacity: 1;
+    }
+  }
+}
