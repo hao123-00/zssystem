@@ -10,6 +10,7 @@ import PermissionList from './pages/Permission/PermissionList';
 import EmployeeList from './pages/Employee/EmployeeList';
 import DepartmentList from './pages/Department/DepartmentList';
 import ProductionManagement from './pages/Production/ProductionManagement';
+import EquipmentManagement from './pages/Equipment/EquipmentManagement';
 
 const App: React.FC = () => {
   return (
@@ -30,6 +31,7 @@ const App: React.FC = () => {
         <Route path="employee" element={<EmployeeList />} />
         <Route path="department" element={<DepartmentList />} />
         <Route path="production" element={<ProductionManagement />} />
+        <Route path="equipment" element={<EquipmentManagement />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

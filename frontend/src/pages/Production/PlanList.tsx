@@ -1,189 +1,193 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Form, Input, DatePicker, Space, message, Tag, Card, Select } from 'antd';
+import { ReloadOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
 import {
-  getPlanList,
-  deletePlan,
-  ProductionPlanInfo,
-  ProductionPlanQueryParams,
+  generateSchedule,
+  getScheduleList,
+  ProductionScheduleInfo,
+  ProductionScheduleQueryParams,
+  ScheduleDayInfo,
 } from '@/api/production';
-import PlanModal from './PlanModal';
+import { getOrderList } from '@/api/production';
 import './ProductionList.less';
 
 const PlanList: React.FC = () => {
   const [form] = Form.useForm();
-  const [tableData, setTableData] = useState<ProductionPlanInfo[]>([]);
+  const [scheduleList, setScheduleList] = useState<ProductionScheduleInfo[]>([]);
   const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0,
-  });
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<ProductionPlanInfo | null>(null);
+  const [machineNoList, setMachineNoList] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadMachineNoList();
+    // 不自动查询，等用户选择机台号或点击查询
+  }, []);
+
+  const loadMachineNoList = async () => {
+    try {
+      setError(null);
+      const response = await getOrderList({ pageNum: 1, pageSize: 1000 });
+      const machineNos = Array.from(
+        new Set((response.list || []).map((order) => order.machineNo).filter(Boolean))
+      );
+      setMachineNoList(machineNos);
+    } catch (error: any) {
+      console.error('加载机台号列表失败', error);
+      setError('加载机台号列表失败: ' + (error.message || '未知错误'));
+    }
+  };
 
   const fetchList = async () => {
     setLoading(true);
+    setError(null);
     try {
       const values = form.getFieldsValue();
-      const params: ProductionPlanQueryParams = {
-        ...values,
-        pageNum: pagination.current,
-        pageSize: pagination.pageSize,
+      const params: ProductionScheduleQueryParams = {
+        machineNo: values.machineNo,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
       };
-      const response = await getPlanList(params);
-      setTableData(response.list || []);
-      setPagination({ ...pagination, total: response.total || 0 });
+      const response = await getScheduleList(params);
+      // 确保 response 是数组
+      if (Array.isArray(response)) {
+        setScheduleList(response);
+      } else {
+        setScheduleList([]);
+      }
     } catch (error: any) {
-      message.error(error.message || '查询失败');
+      console.error('查询排程列表失败', error);
+      // 如果是404或空数据，不显示错误，只显示空列表
+      if (error.response?.status === 404) {
+        setScheduleList([]);
+      } else {
+        setError(error.message || '查询排程列表失败');
+        setScheduleList([]);
+        message.error(error.message || '查询失败');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchList();
-  }, [pagination.current, pagination.pageSize]);
-
-  const handleAdd = () => {
-    setEditingPlan(null);
-    setModalVisible(true);
-  };
-
-  const handleEdit = (record: ProductionPlanInfo) => {
-    setEditingPlan(record);
-    setModalVisible(true);
-  };
-
-  const handleDelete = async (id: number) => {
+  const handleGenerate = async (machineNo?: string) => {
     try {
-      await deletePlan(id);
-      message.success('删除成功');
+      const values = form.getFieldsValue();
+      const targetMachineNo = machineNo || values.machineNo;
+      
+      if (!targetMachineNo) {
+        message.warning('请先选择机台号');
+        return;
+      }
+      
+      const startDate = values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+      
+      setLoading(true);
+      await generateSchedule(targetMachineNo, startDate);
+      message.success('生成排程成功');
       fetchList();
     } catch (error: any) {
-      message.error(error.message || '删除失败');
+      message.error(error.message || '生成排程失败');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSearch = () => {
-    setPagination({ ...pagination, current: 1 });
     fetchList();
   };
 
   const handleReset = () => {
     form.resetFields();
-    setPagination({ ...pagination, current: 1 });
+    form.setFieldsValue({
+      startDate: dayjs(),
+    });
     fetchList();
   };
 
-  const handleTableChange = (page: number, pageSize: number) => {
-    setPagination({ ...pagination, current: page, pageSize });
-  };
+  // 构建表格列（动态日期列）
+  const buildColumns = (schedule: ProductionScheduleInfo) => {
+    const baseColumns = [
+      {
+        title: '机台号',
+        dataIndex: 'machineNo',
+        key: 'machineNo',
+        width: 120,
+        fixed: 'left' as const,
+      },
+      {
+        title: '设备名称',
+        dataIndex: 'equipmentName',
+        key: 'equipmentName',
+        width: 150,
+        fixed: 'left' as const,
+      },
+      {
+        title: '组别',
+        dataIndex: 'groupName',
+        key: 'groupName',
+        width: 100,
+        fixed: 'left' as const,
+      },
+    ];
 
-  const getStatusTag = (status: number) => {
-    const statusMap: Record<number, { color: string; text: string }> = {
-      0: { color: 'default', text: '待执行' },
-      1: { color: 'processing', text: '执行中' },
-      2: { color: 'success', text: '已完成' },
-    };
-    const statusInfo = statusMap[status] || { color: 'default', text: '未知' };
-    return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
-  };
-
-  const columns = [
-    {
-      title: '计划编号',
-      dataIndex: 'planNo',
-      key: 'planNo',
+    // 动态日期列
+    const dateColumns = (schedule.scheduleDays || []).map((day: ScheduleDayInfo) => ({
+      title: day.scheduleDate || '',
+      key: `day_${day.dayNumber}`,
       width: 150,
-    },
-    {
-      title: '订单编号',
-      dataIndex: 'orderNo',
-      key: 'orderNo',
-      width: 150,
-    },
-    {
-      title: '产品名称',
-      dataIndex: 'productName',
-      key: 'productName',
-      width: 150,
-    },
-    {
-      title: '计划数量',
-      dataIndex: 'planQuantity',
-      key: 'planQuantity',
-      width: 100,
-    },
-    {
-      title: '已完成数量',
-      dataIndex: 'completedQuantity',
-      key: 'completedQuantity',
-      width: 120,
-    },
-    {
-      title: '操作员',
-      dataIndex: 'operatorName',
-      key: 'operatorName',
-      width: 100,
-    },
-    {
-      title: '计划开始时间',
-      dataIndex: 'planStartTime',
-      key: 'planStartTime',
-      width: 180,
-      render: (text: string) => (text ? new Date(text).toLocaleString() : '-'),
-    },
-    {
-      title: '计划结束时间',
-      dataIndex: 'planEndTime',
-      key: 'planEndTime',
-      width: 180,
-      render: (text: string) => (text ? new Date(text).toLocaleString() : '-'),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 100,
-      render: (status: number) => getStatusTag(status),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 150,
-      fixed: 'right' as const,
-      render: (_: any, record: ProductionPlanInfo) => (
-        <Space>
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            编辑
-          </Button>
-          <Popconfirm title="确定要删除吗？" onConfirm={() => handleDelete(record.id)}>
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
+      render: () => (
+        <div>
+          <div>{day.productName || '-'}</div>
+          <div style={{ color: '#666', fontSize: '12px' }}>
+            排产: {day.productionQuantity || 0} | 剩余: {day.remainingQuantity || 0}
+          </div>
+        </div>
       ),
-    },
-  ];
+    }));
+
+    return [...baseColumns, ...dateColumns];
+  };
+
+  // 如果有错误，显示错误信息
+  if (error) {
+    return (
+      <div className="production-list-container">
+        <Card>
+          <div style={{ textAlign: 'center', padding: '40px', color: '#ff4d4f' }}>
+            <p>加载失败</p>
+            <p style={{ marginTop: 16 }}>{error}</p>
+            <Button type="primary" onClick={loadMachineNoList} style={{ marginTop: 16 }}>
+              重试
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="production-list-container">
       <div className="search-form">
-        <Form form={form} layout="inline">
-          <Form.Item name="planNo">
-            <Input placeholder="计划编号" allowClear />
+        <Form form={form} layout="inline" initialValues={{ startDate: dayjs() }}>
+          <Form.Item name="machineNo" label="机台号">
+            <Select
+              placeholder="请选择机台号"
+              allowClear
+              showSearch
+              style={{ width: 200 }}
+              options={machineNoList.map((no) => ({ value: no, label: no }))}
+              onChange={(value) => {
+                // 选择机台号后自动查询该机台号的排程
+                if (value) {
+                  fetchList();
+                } else {
+                  setScheduleList([]);
+                }
+              }}
+            />
           </Form.Item>
-          <Form.Item name="orderId">
-            <Input placeholder="订单ID" allowClear />
-          </Form.Item>
-          <Form.Item name="status">
-            <Select placeholder="状态" allowClear style={{ width: 120 }}>
-              <Select.Option value={0}>待执行</Select.Option>
-              <Select.Option value={1}>执行中</Select.Option>
-              <Select.Option value={2}>已完成</Select.Option>
-            </Select>
+          <Form.Item name="startDate" label="排程开始日期">
+            <DatePicker format="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item>
             <Space>
@@ -196,39 +200,71 @@ const PlanList: React.FC = () => {
         </Form>
       </div>
 
-      <div className="toolbar">
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增计划
-        </Button>
-        <Button icon={<ReloadOutlined />} onClick={fetchList}>
-          刷新
-        </Button>
+      <div className="toolbar" style={{ marginBottom: 16 }}>
+        <Space>
+          <Button
+            type="primary"
+            icon={<PlayCircleOutlined />}
+            onClick={() => handleGenerate()}
+            loading={loading}
+          >
+            生成排程
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={fetchList} loading={loading}>
+            刷新
+          </Button>
+          <span style={{ color: '#999', marginLeft: 16 }}>
+            提示：请先选择机台号，然后点击"生成排程"按钮
+          </span>
+        </Space>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: 1400 }}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-        }}
-      />
-
-      <PlanModal
-        visible={modalVisible}
-        plan={editingPlan}
-        onCancel={() => setModalVisible(false)}
-        onSuccess={() => {
-          setModalVisible(false);
-          fetchList();
-        }}
-      />
+      <div className="schedule-list">
+        {scheduleList.length === 0 ? (
+          <Card>
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <p>暂无排程数据</p>
+              <p style={{ marginTop: 16, color: '#999' }}>
+                请先选择机台号，然后点击"生成排程"按钮
+              </p>
+            </div>
+          </Card>
+        ) : (
+          scheduleList.map((schedule) => (
+            <Card
+              key={schedule.machineNo}
+              title={
+                <Space>
+                  <span>机台号: {schedule.machineNo}</span>
+                  {schedule.equipmentName && <span>设备: {schedule.equipmentName}</span>}
+                  {schedule.groupName && <span>组别: {schedule.groupName}</span>}
+                  <Tag color={schedule.canCompleteTarget ? 'success' : 'error'}>
+                    {schedule.canCompleteTarget ? '可完成目标' : '无法完成目标'}
+                  </Tag>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<PlayCircleOutlined />}
+                    onClick={() => handleGenerate(schedule.machineNo)}
+                  >
+                    重新生成
+                  </Button>
+                </Space>
+              }
+              style={{ marginBottom: 16 }}
+            >
+              <Table
+                columns={buildColumns(schedule)}
+                dataSource={[{ ...schedule }]}
+                rowKey="machineNo"
+                loading={loading}
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+              />
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 };

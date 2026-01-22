@@ -1,16 +1,23 @@
 import request from '@/utils/request';
 
 // ========== 生产订单 ==========
+export interface ProductInfo {
+  productName: string;
+  productCode?: string;
+  orderQuantity: number;
+  dailyCapacity: number;
+  sortOrder?: number;
+}
+
 export interface ProductionOrderInfo {
   id: number;
   orderNo: string;
-  customerName?: string;
-  productName: string;
-  productCode?: string;
-  quantity: number;
-  completedQuantity: number;
-  deliveryDate?: string;
-  status: number; // 0-待生产，1-生产中，2-已完成，3-已取消
+  machineNo: string; // 机台号
+  equipmentId?: number;
+  equipmentNo?: string;
+  products?: ProductInfo[]; // 产品列表（最多3个）
+  status: number; // 0-待排程，1-排程中，2-已完成
+  statusText?: string;
   remark?: string;
   createTime?: string;
   updateTime?: string;
@@ -18,7 +25,7 @@ export interface ProductionOrderInfo {
 
 export interface ProductionOrderQueryParams {
   orderNo?: string;
-  customerName?: string;
+  machineNo?: string; // 机台号
   productName?: string;
   status?: number;
   pageNum?: number;
@@ -28,92 +35,104 @@ export interface ProductionOrderQueryParams {
 export interface ProductionOrderSaveParams {
   id?: number;
   orderNo?: string;
-  customerName?: string;
-  productName: string;
-  productCode?: string;
-  quantity: number;
-  deliveryDate?: string;
-  status: number;
+  machineNo: string; // 机台号
+  products: ProductInfo[]; // 产品列表（1-3个）
   remark?: string;
 }
 
-// ========== 生产计划 ==========
-export interface ProductionPlanInfo {
-  id: number;
-  planNo: string;
-  orderId: number;
-  orderNo?: string;
-  productName?: string;
+// ========== 生产计划排程 ==========
+export interface ProductionScheduleInfo {
+  machineNo: string; // 机台号
   equipmentId?: number;
+  equipmentNo?: string;
   equipmentName?: string;
-  moldId?: number;
-  moldName?: string;
-  operatorId?: number;
-  operatorName?: string;
-  planStartTime?: string;
-  planEndTime?: string;
-  planQuantity: number;
-  completedQuantity?: number;
-  status: number; // 0-待执行，1-执行中，2-已完成
-  remark?: string;
-  createTime?: string;
-  updateTime?: string;
+  groupName?: string;
+  scheduleStartDate: string; // 排程开始日期
+  scheduleDays: ScheduleDayInfo[]; // 排程详情（排除星期天）
+  canCompleteTarget: boolean; // 是否能在指定时间内完成生产目标
 }
 
-export interface ProductionPlanQueryParams {
-  planNo?: string;
-  orderId?: number;
-  equipmentId?: number;
-  status?: number;
-  pageNum?: number;
-  pageSize?: number;
+export interface ScheduleDayInfo {
+  dayNumber: number; // 第几天（排除星期天后的天数）
+  scheduleDate: string; // 排程日期
+  productName: string; // 产品名称
+  productionQuantity: number; // 排产数量（等于产能）
+  dailyCapacity: number; // 产能
+  remainingQuantity: number; // 剩余数量
 }
 
-export interface ProductionPlanSaveParams {
-  id?: number;
-  planNo?: string;
-  orderId: number;
-  equipmentId?: number;
-  moldId?: number;
-  operatorId?: number;
-  planStartTime?: string;
-  planEndTime?: string;
-  planQuantity: number;
-  status: number;
-  remark?: string;
+export interface ProductionScheduleQueryParams {
+  machineNo?: string; // 机台号
+  startDate?: string; // 排程开始日期
 }
 
 // ========== 生产记录 ==========
+export interface ProductionRecordProductInfo {
+  productName: string;
+  productCode?: string;
+  orderQuantity: number;
+  dailyCapacity: number;
+  remainingQuantity?: number;
+}
+
+export interface ProductionRecordScheduleInfo {
+  scheduleDate: string;
+  dayNumber: number;
+  productName: string;
+  productionQuantity: number;
+  dailyCapacity: number;
+  remainingQuantity: number;
+}
+
 export interface ProductionRecordInfo {
   id: number;
   recordNo: string;
-  orderId: number;
+  orderId?: number;
   orderNo?: string;
+  equipmentId?: number;
+  equipmentNo?: string;
+  equipmentName?: string;
+  
+  // 设备详细信息
+  groupName?: string;
+  machineNo?: string;
+  equipmentModel?: string;
+  robotModel?: string;
+  enableDate?: string;
+  serviceLife?: number;
+  moldTempMachine?: string;
+  chiller?: string;
+  basicMold?: string;
+  spareMold1?: string;
+  spareMold2?: string;
+  spareMold3?: string;
+  
+  // 产品信息
+  products?: ProductionRecordProductInfo[];
   productName?: string;
+  
+  // 排程情况
+  schedules?: ProductionRecordScheduleInfo[];
+  
+  scheduleId?: number;
+  productCode?: string;
   planId?: number;
   planNo?: string;
-  equipmentId?: number;
-  equipmentName?: string;
-  moldId?: number;
-  moldName?: string;
-  operatorId?: number;
-  operatorName?: string;
   productionDate: string;
   startTime?: string;
   endTime?: string;
   quantity: number;
-  defectQuantity: number;
+  defectQuantity?: number;
+  operatorId?: number;
+  operatorName?: string;
   remark?: string;
   createTime?: string;
   updateTime?: string;
 }
 
 export interface ProductionRecordQueryParams {
-  recordNo?: string;
-  orderId?: number;
-  planId?: number;
-  equipmentId?: number;
-  productionDate?: string;
+  equipmentNo?: string;
+  productName?: string;
   startDate?: string;
   endDate?: string;
   pageNum?: number;
@@ -123,11 +142,10 @@ export interface ProductionRecordQueryParams {
 export interface ProductionRecordSaveParams {
   id?: number;
   recordNo?: string;
-  orderId: number;
-  planId?: number;
-  equipmentId?: number;
-  moldId?: number;
-  operatorId?: number;
+  equipmentId: number;
+  scheduleId?: number;
+  productCode?: string;
+  productName: string;
   productionDate: string;
   startTime?: string;
   endTime?: string;
@@ -136,7 +154,7 @@ export interface ProductionRecordSaveParams {
   remark?: string;
 }
 
-// ========== 订单 API ==========
+// ========== 生产订单 API ==========
 export const getOrderList = (params: ProductionOrderQueryParams) => {
   return request.get<{
     list: ProductionOrderInfo[];
@@ -160,31 +178,28 @@ export const deleteOrder = (id: number) => {
   return request.delete<void>(`/production/order/${id}`);
 };
 
-// ========== 计划 API ==========
-export const getPlanList = (params: ProductionPlanQueryParams) => {
-  return request.get<{
-    list: ProductionPlanInfo[];
-    total: number;
-  }>('/production/plan/list', { params });
+// ========== 生产计划排程 API ==========
+export const generateSchedule = (machineNo: string, startDate?: string) => {
+  const params: any = { machineNo };
+  if (startDate) {
+    params.startDate = startDate;
+  }
+  return request.post<ProductionScheduleInfo>('/production/schedule/generate', null, {
+    params,
+  });
 };
 
-export const getPlanById = (id: number) => {
-  return request.get<ProductionPlanInfo>(`/production/plan/${id}`);
+export const getScheduleList = (params: ProductionScheduleQueryParams) => {
+  return request.get<ProductionScheduleInfo[]>('/production/schedule/list', { params });
 };
 
-export const createPlan = (data: ProductionPlanSaveParams) => {
-  return request.post<void>('/production/plan', data);
+export const getScheduleByMachineNo = (machineNo: string, startDate?: string) => {
+  return request.get<ProductionScheduleInfo>(`/production/schedule/machine/${machineNo}`, {
+    params: { startDate },
+  });
 };
 
-export const updatePlan = (id: number, data: ProductionPlanSaveParams) => {
-  return request.put<void>(`/production/plan/${id}`, data);
-};
-
-export const deletePlan = (id: number) => {
-  return request.delete<void>(`/production/plan/${id}`);
-};
-
-// ========== 记录 API ==========
+// ========== 生产记录 API ==========
 export const getRecordList = (params: ProductionRecordQueryParams) => {
   return request.get<{
     list: ProductionRecordInfo[];
@@ -206,4 +221,11 @@ export const updateRecord = (id: number, data: ProductionRecordSaveParams) => {
 
 export const deleteRecord = (id: number) => {
   return request.delete<void>(`/production/record/${id}`);
+};
+
+export const exportRecord = (params: ProductionRecordQueryParams) => {
+  return request.get('/production/record/export', {
+    params,
+    responseType: 'blob',
+  });
 };

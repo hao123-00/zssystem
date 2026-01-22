@@ -1,5 +1,6 @@
 package com.zssystem.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -20,8 +21,10 @@ public class ProductionPlanSaveDTO {
 
     private Long operatorId;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime planStartTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime planEndTime;
 
     @NotNull(message = "计划数量不能为空")

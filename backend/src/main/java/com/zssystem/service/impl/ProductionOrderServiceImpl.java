@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zssystem.dto.ProductionOrderSaveDTO;
 import com.zssystem.dto.ProductionOrderQueryDTO;
+import com.zssystem.entity.Equipment;
 import com.zssystem.entity.ProductionOrder;
-import com.zssystem.entity.ProductionRecord;
+import com.zssystem.entity.ProductionOrderProduct;
+import com.zssystem.mapper.EquipmentMapper;
 import com.zssystem.mapper.ProductionOrderMapper;
-import com.zssystem.mapper.ProductionRecordMapper;
+import com.zssystem.mapper.ProductionOrderProductMapper;
 import com.zssystem.service.ProductionOrderService;
 import com.zssystem.util.BeanUtil;
 import com.zssystem.util.CodeGenerator;
@@ -19,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class ProductionOrderServiceImpl implements ProductionOrderService {
@@ -27,9 +31,19 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
     private ProductionOrderMapper orderMapper;
 
     @Autowired
-    private ProductionRecordMapper recordMapper;
+    private EquipmentMapper equipmentMapper;
+
+    @Autowired
+    private ProductionOrderProductMapper orderProductMapper;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    private static final Map<Integer, String> STATUS_MAP = new HashMap<>();
+    static {
+        STATUS_MAP.put(0, "待排程");
+        STATUS_MAP.put(1, "排程中");
+        STATUS_MAP.put(2, "已完成");
+    }
 
     @Override
     public IPage<ProductionOrderVO> getOrderList(ProductionOrderQueryDTO queryDTO) {
@@ -37,15 +51,57 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
         LambdaQueryWrapper<ProductionOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(queryDTO.getOrderNo() != null && !queryDTO.getOrderNo().isBlank(), 
                         ProductionOrder::getOrderNo, queryDTO.getOrderNo())
-                .like(queryDTO.getCustomerName() != null && !queryDTO.getCustomerName().isBlank(), 
-                        ProductionOrder::getCustomerName, queryDTO.getCustomerName())
-                .like(queryDTO.getProductName() != null && !queryDTO.getProductName().isBlank(), 
-                        ProductionOrder::getProductName, queryDTO.getProductName())
+                .like(queryDTO.getMachineNo() != null && !queryDTO.getMachineNo().isBlank(), 
+                        ProductionOrder::getMachineNo, queryDTO.getMachineNo())
                 .eq(queryDTO.getStatus() != null, ProductionOrder::getStatus, queryDTO.getStatus())
                 .orderByDesc(ProductionOrder::getCreateTime);
 
+        // 如果按产品名称查询，需要关联订单产品表
+        if (queryDTO.getProductName() != null && !queryDTO.getProductName().isBlank()) {
+            // 先查询包含该产品名称的订单ID
+            LambdaQueryWrapper<ProductionOrderProduct> productWrapper = new LambdaQueryWrapper<>();
+            productWrapper.like(ProductionOrderProduct::getProductName, queryDTO.getProductName());
+            java.util.List<ProductionOrderProduct> products = orderProductMapper.selectList(productWrapper);
+            java.util.Set<Long> orderIds = products.stream()
+                    .map(ProductionOrderProduct::getOrderId)
+                    .collect(java.util.stream.Collectors.toSet());
+            if (orderIds.isEmpty()) {
+                // 如果没有匹配的产品，返回空结果
+                return new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
+            }
+            wrapper.in(ProductionOrder::getId, orderIds);
+        }
+
         IPage<ProductionOrder> orderPage = orderMapper.selectPage(page, wrapper);
-        return orderPage.convert(order -> BeanUtil.copyProperties(order, ProductionOrderVO.class));
+        return orderPage.convert(order -> {
+            ProductionOrderVO vo = BeanUtil.copyProperties(order, ProductionOrderVO.class);
+            vo.setStatusText(STATUS_MAP.getOrDefault(order.getStatus(), "未知"));
+            
+            // 填充设备信息
+            if (order.getEquipmentId() != null) {
+                Equipment equipment = equipmentMapper.selectById(order.getEquipmentId());
+                if (equipment != null) {
+                    vo.setEquipmentNo(equipment.getEquipmentNo());
+                }
+            }
+            
+            // 填充产品列表
+            LambdaQueryWrapper<ProductionOrderProduct> productWrapper = new LambdaQueryWrapper<>();
+            productWrapper.eq(ProductionOrderProduct::getOrderId, order.getId())
+                    .orderByAsc(ProductionOrderProduct::getSortOrder);
+            java.util.List<ProductionOrderProduct> products = orderProductMapper.selectList(productWrapper);
+            vo.setProducts(products.stream().map(p -> {
+                ProductionOrderVO.ProductInfo info = new ProductionOrderVO.ProductInfo();
+                info.setProductName(p.getProductName());
+                info.setProductCode(p.getProductCode());
+                info.setOrderQuantity(p.getOrderQuantity());
+                info.setDailyCapacity(p.getDailyCapacity());
+                info.setSortOrder(p.getSortOrder());
+                return info;
+            }).collect(java.util.stream.Collectors.toList()));
+            
+            return vo;
+        });
     }
 
     @Override
@@ -54,24 +110,100 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
         if (order == null) {
             throw new RuntimeException("订单不存在");
         }
-        return BeanUtil.copyProperties(order, ProductionOrderVO.class);
+        ProductionOrderVO vo = BeanUtil.copyProperties(order, ProductionOrderVO.class);
+        vo.setStatusText(STATUS_MAP.getOrDefault(order.getStatus(), "未知"));
+        
+        // 填充设备信息
+        if (order.getEquipmentId() != null) {
+            Equipment equipment = equipmentMapper.selectById(order.getEquipmentId());
+            if (equipment != null) {
+                vo.setEquipmentNo(equipment.getEquipmentNo());
+            }
+        }
+        
+        // 填充产品列表
+        LambdaQueryWrapper<ProductionOrderProduct> productWrapper = new LambdaQueryWrapper<>();
+        productWrapper.eq(ProductionOrderProduct::getOrderId, order.getId())
+                .orderByAsc(ProductionOrderProduct::getSortOrder);
+        java.util.List<ProductionOrderProduct> products = orderProductMapper.selectList(productWrapper);
+        vo.setProducts(products.stream().map(p -> {
+            ProductionOrderVO.ProductInfo info = new ProductionOrderVO.ProductInfo();
+            info.setProductName(p.getProductName());
+            info.setProductCode(p.getProductCode());
+            info.setOrderQuantity(p.getOrderQuantity());
+            info.setDailyCapacity(p.getDailyCapacity());
+            info.setSortOrder(p.getSortOrder());
+            return info;
+        }).collect(java.util.stream.Collectors.toList()));
+        
+        return vo;
     }
 
     @Override
     @Transactional
     public void createOrder(ProductionOrderSaveDTO saveDTO) {
-        // 生成订单编号
+        // 根据机台号查询设备
+        Equipment equipment = equipmentMapper.selectOne(
+            new LambdaQueryWrapper<Equipment>()
+                .eq(Equipment::getMachineNo, saveDTO.getMachineNo())
+        );
+        
+        // 生成订单编号（避免并发重复）
         String datePrefix = "ORDER" + LocalDate.now().format(DATE_FORMATTER);
-        Integer count = orderMapper.countByPrefix(datePrefix);
-        String orderNo = CodeGenerator.generateOrderNo(count + 1);
+        String maxOrderNo = orderMapper.getMaxOrderNoByPrefix(datePrefix);
+        int sequence = 1;
+        if (maxOrderNo != null && maxOrderNo.startsWith(datePrefix)) {
+            // 提取序号：ORDER20260122 + 001 -> 提取 001
+            String seqStr = maxOrderNo.substring(datePrefix.length());
+            try {
+                sequence = Integer.parseInt(seqStr) + 1;
+            } catch (NumberFormatException e) {
+                sequence = 1;
+            }
+        }
+        String orderNo = CodeGenerator.generateOrderNo(sequence);
+        
+        // 检查订单编号是否已存在（双重检查，防止并发）
+        int retryCount = 0;
+        while (orderMapper.selectByOrderNo(orderNo) != null && retryCount < 10) {
+            sequence++;
+            orderNo = CodeGenerator.generateOrderNo(sequence);
+            retryCount++;
+        }
+        if (retryCount >= 10) {
+            throw new RuntimeException("生成订单编号失败，请稍后重试");
+        }
 
-        ProductionOrder order = BeanUtil.copyProperties(saveDTO, ProductionOrder.class);
+        ProductionOrder order = new ProductionOrder();
         order.setOrderNo(orderNo);
-        order.setCompletedQuantity(0);
+        order.setMachineNo(saveDTO.getMachineNo());
+        order.setRemark(saveDTO.getRemark());
+        
+        // 设置设备ID
+        if (equipment != null) {
+            order.setEquipmentId(equipment.getId());
+        }
+        
         if (order.getStatus() == null) {
-            order.setStatus(0); // 默认待生产
+            order.setStatus(0); // 默认待排程
         }
         orderMapper.insert(order);
+        
+        // 保存产品列表
+        if (saveDTO.getProducts() != null && !saveDTO.getProducts().isEmpty()) {
+            for (int i = 0; i < saveDTO.getProducts().size(); i++) {
+                ProductionOrderSaveDTO.ProductInfo productInfo = saveDTO.getProducts().get(i);
+                ProductionOrderProduct product = new ProductionOrderProduct();
+                product.setOrderId(order.getId());
+                product.setOrderNo(orderNo);
+                product.setProductName(productInfo.getProductName());
+                product.setProductCode(productInfo.getProductCode());
+                product.setOrderQuantity(productInfo.getOrderQuantity());
+                product.setDailyCapacity(productInfo.getDailyCapacity());
+                product.setSortOrder(i + 1); // 1, 2, 3
+                orderProductMapper.insert(product);
+            }
+        }
     }
 
     @Override
@@ -82,24 +214,43 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
             throw new RuntimeException("订单不存在");
         }
 
-        // 检查是否有生产记录
-        if (saveDTO.getStatus() != null && saveDTO.getStatus() == 3) { // 取消订单
-            Long recordCount = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecord>()
-                    .eq(ProductionRecord::getOrderId, id));
-            if (recordCount != null && recordCount > 0) {
-                throw new RuntimeException("订单已有生产记录，无法取消");
-            }
-        }
-
-        BeanUtil.copyProperties(saveDTO, order, "id", "orderNo", "completedQuantity", "createTime", "updateTime", "deleted");
+        // 更新订单基本信息
+        order.setMachineNo(saveDTO.getMachineNo());
+        order.setRemark(saveDTO.getRemark());
         
-        // 如果完成数量达到订单数量，自动更新状态为已完成
-        if (order.getCompletedQuantity() != null && order.getQuantity() != null 
-                && order.getCompletedQuantity() >= order.getQuantity()) {
-            order.setStatus(2); // 已完成
+        // 如果机台号有变化，更新设备ID
+        if (saveDTO.getMachineNo() != null && !saveDTO.getMachineNo().equals(order.getMachineNo())) {
+            Equipment equipment = equipmentMapper.selectOne(
+                new LambdaQueryWrapper<Equipment>()
+                    .eq(Equipment::getMachineNo, saveDTO.getMachineNo())
+            );
+            if (equipment != null) {
+                order.setEquipmentId(equipment.getId());
+            }
         }
         
         orderMapper.updateById(order);
+        
+        // 删除旧的产品记录
+        LambdaQueryWrapper<ProductionOrderProduct> deleteWrapper = new LambdaQueryWrapper<>();
+        deleteWrapper.eq(ProductionOrderProduct::getOrderId, id);
+        orderProductMapper.delete(deleteWrapper);
+        
+        // 保存新的产品列表
+        if (saveDTO.getProducts() != null && !saveDTO.getProducts().isEmpty()) {
+            for (int i = 0; i < saveDTO.getProducts().size(); i++) {
+                ProductionOrderSaveDTO.ProductInfo productInfo = saveDTO.getProducts().get(i);
+                ProductionOrderProduct product = new ProductionOrderProduct();
+                product.setOrderId(order.getId());
+                product.setOrderNo(order.getOrderNo());
+                product.setProductName(productInfo.getProductName());
+                product.setProductCode(productInfo.getProductCode());
+                product.setOrderQuantity(productInfo.getOrderQuantity());
+                product.setDailyCapacity(productInfo.getDailyCapacity());
+                product.setSortOrder(i + 1); // 1, 2, 3
+                orderProductMapper.insert(product);
+            }
+        }
     }
 
     @Override
@@ -110,35 +261,30 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
             throw new RuntimeException("订单不存在");
         }
 
-        // 检查是否有生产记录
-        Long recordCount = recordMapper.selectCount(new LambdaQueryWrapper<ProductionRecord>()
-                .eq(ProductionRecord::getOrderId, id));
-        if (recordCount != null && recordCount > 0) {
-            throw new RuntimeException("订单已有生产记录，无法删除");
-        }
-
+        // 删除关联的产品记录
+        LambdaQueryWrapper<ProductionOrderProduct> deleteWrapper = new LambdaQueryWrapper<>();
+        deleteWrapper.eq(ProductionOrderProduct::getOrderId, id);
+        orderProductMapper.delete(deleteWrapper);
+        
+        // 删除订单
         orderMapper.deleteById(id);
     }
 
     @Override
     @Transactional
     public void updateCompletedQuantity(Long orderId, Integer quantity) {
+        // 此方法在新需求中可能不再需要，但保留以保持接口兼容性
         ProductionOrder order = orderMapper.selectById(orderId);
         if (order == null) {
             return;
         }
 
-        Integer newCompletedQuantity = (order.getCompletedQuantity() == null ? 0 : order.getCompletedQuantity()) + quantity;
-        order.setCompletedQuantity(newCompletedQuantity);
-
-        // 如果完成数量达到订单数量，自动更新状态为已完成
-        if (newCompletedQuantity >= order.getQuantity()) {
-            order.setStatus(2); // 已完成
-        } else if (order.getStatus() == 0 && newCompletedQuantity > 0) {
-            // 如果从待生产状态开始有产量，更新为生产中
-            order.setStatus(1); // 生产中
+        // 根据实际生产记录更新订单状态
+        // 这里可以根据生产记录来更新状态
+        if (order.getStatus() == 0) {
+            order.setStatus(1); // 排程中
         }
-
+        
         orderMapper.updateById(order);
     }
 }

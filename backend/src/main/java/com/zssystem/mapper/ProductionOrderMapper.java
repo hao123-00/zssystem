@@ -13,4 +13,7 @@ public interface ProductionOrderMapper extends BaseMapper<ProductionOrder> {
 
     @Select("SELECT COUNT(*) FROM production_order WHERE order_no LIKE CONCAT(#{prefix}, '%') AND deleted = 0")
     Integer countByPrefix(String prefix);
+    
+    @Select("SELECT order_no FROM production_order WHERE order_no LIKE CONCAT(#{prefix}, '%') AND deleted = 0 ORDER BY order_no DESC LIMIT 1")
+    String getMaxOrderNoByPrefix(String prefix);
 }

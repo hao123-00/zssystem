@@ -82,10 +82,9 @@ const OrderList: React.FC = () => {
 
   const getStatusTag = (status: number) => {
     const statusMap: Record<number, { color: string; text: string }> = {
-      0: { color: 'default', text: '待生产' },
-      1: { color: 'processing', text: '生产中' },
+      0: { color: 'default', text: '待排程' },
+      1: { color: 'processing', text: '排程中' },
       2: { color: 'success', text: '已完成' },
-      3: { color: 'error', text: '已取消' },
     };
     const statusInfo = statusMap[status] || { color: 'default', text: '未知' };
     return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
@@ -99,51 +98,35 @@ const OrderList: React.FC = () => {
       width: 150,
     },
     {
-      title: '客户名称',
-      dataIndex: 'customerName',
-      key: 'customerName',
-      width: 150,
-    },
-    {
-      title: '产品名称',
-      dataIndex: 'productName',
-      key: 'productName',
-      width: 150,
-    },
-    {
-      title: '产品编码',
-      dataIndex: 'productCode',
-      key: 'productCode',
+      title: '机台号',
+      dataIndex: 'machineNo',
+      key: 'machineNo',
       width: 120,
     },
     {
-      title: '订单数量',
-      dataIndex: 'quantity',
-      key: 'quantity',
-      width: 100,
-    },
-    {
-      title: '已完成数量',
-      dataIndex: 'completedQuantity',
-      key: 'completedQuantity',
-      width: 120,
-    },
-    {
-      title: '完成率',
-      key: 'completionRate',
-      width: 100,
+      title: '产品信息',
+      key: 'products',
+      width: 300,
       render: (_: any, record: ProductionOrderInfo) => {
-        const rate = record.quantity > 0 
-          ? ((record.completedQuantity / record.quantity) * 100).toFixed(1) 
-          : '0.0';
-        return `${rate}%`;
+        if (!record.products || record.products.length === 0) {
+          return '-';
+        }
+        return (
+          <div>
+            {record.products.map((p, index) => (
+              <div key={index} style={{ marginBottom: 4 }}>
+                <div>
+                  <strong>{p.productName}</strong>
+                  {p.productCode && <span style={{ color: '#999', marginLeft: 8 }}>({p.productCode})</span>}
+                </div>
+                <div style={{ fontSize: '12px', color: '#666' }}>
+                  数量: {p.orderQuantity} | 产能: {p.dailyCapacity}/天
+                </div>
+              </div>
+            ))}
+          </div>
+        );
       },
-    },
-    {
-      title: '交期',
-      dataIndex: 'deliveryDate',
-      key: 'deliveryDate',
-      width: 120,
     },
     {
       title: '状态',
@@ -186,18 +169,17 @@ const OrderList: React.FC = () => {
           <Form.Item name="orderNo">
             <Input placeholder="订单编号" allowClear />
           </Form.Item>
-          <Form.Item name="customerName">
-            <Input placeholder="客户名称" allowClear />
+          <Form.Item name="machineNo">
+            <Input placeholder="机台号" allowClear />
           </Form.Item>
           <Form.Item name="productName">
             <Input placeholder="产品名称" allowClear />
           </Form.Item>
           <Form.Item name="status">
             <Select placeholder="状态" allowClear style={{ width: 120 }}>
-              <Select.Option value={0}>待生产</Select.Option>
-              <Select.Option value={1}>生产中</Select.Option>
+              <Select.Option value={0}>待排程</Select.Option>
+              <Select.Option value={1}>排程中</Select.Option>
               <Select.Option value={2}>已完成</Select.Option>
-              <Select.Option value={3}>已取消</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item>
@@ -225,7 +207,7 @@ const OrderList: React.FC = () => {
         dataSource={tableData}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1200 }}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,

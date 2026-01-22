@@ -1,5 +1,6 @@
 package com.zssystem.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -17,6 +18,8 @@ public class ProductionRecordSaveDTO {
 
     private Long planId;
 
+    private Long scheduleId; // 排程ID（关联production_schedule）
+
     private Long equipmentId;
 
     private Long moldId;
@@ -26,8 +29,10 @@ public class ProductionRecordSaveDTO {
     @NotNull(message = "生产日期不能为空")
     private LocalDate productionDate;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime startTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private LocalDateTime endTime;
 
     @NotNull(message = "产量不能为空")

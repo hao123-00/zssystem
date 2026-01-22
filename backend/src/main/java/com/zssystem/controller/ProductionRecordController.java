@@ -6,8 +6,10 @@ import com.zssystem.common.Result;
 import com.zssystem.dto.ProductionRecordQueryDTO;
 import com.zssystem.dto.ProductionRecordSaveDTO;
 import com.zssystem.service.ProductionRecordService;
+import com.zssystem.util.ExcelUtil;
 import com.zssystem.vo.ProductionRecordVO;
 import com.zssystem.vo.ProductionStatisticsVO;
+import com.zssystem.vo.excel.ProductionRecordExportVO;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -61,5 +63,12 @@ public class ProductionRecordController {
             @RequestParam(required = false) LocalDate endDate) {
         List<ProductionStatisticsVO> statistics = recordService.getStatistics(dimension, startDate, endDate);
         return Result.success(statistics);
+    }
+
+    @GetMapping("/export")
+    public void exportRecord(@Validated ProductionRecordQueryDTO queryDTO) {
+        List<ProductionRecordExportVO> exportData = recordService.getExportData(queryDTO);
+        String fileName = ExcelUtil.generateFileName("生产管理_生产记录");
+        ExcelUtil.exportExcel(exportData, fileName, "生产记录", ProductionRecordExportVO.class);
     }
 }

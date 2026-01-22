@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Form, Input, DatePicker, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Form, Input, DatePicker, Space, message, Popconfirm, Tag, Descriptions, Card, Collapse } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import {
   getRecordList,
   deleteRecord,
+  exportRecord,
   ProductionRecordInfo,
   ProductionRecordQueryParams,
 } from '@/api/production';
+import { exportExcel } from '@/utils/excel';
 import RecordModal from './RecordModal';
 import './ProductionList.less';
 import dayjs from 'dayjs';
@@ -84,30 +86,67 @@ const RecordList: React.FC = () => {
     setPagination({ ...pagination, current: page, pageSize });
   };
 
+  const handleExport = async () => {
+    try {
+      const values = form.getFieldsValue();
+      const params: ProductionRecordQueryParams = {
+        ...values,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
+        endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : undefined,
+        productionDate: values.productionDate ? values.productionDate.format('YYYY-MM-DD') : undefined,
+      };
+      
+      const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `生产管理_生产记录_${date}`;
+      await exportExcel('/api/production/record/export', params, filename);
+    } catch (error: any) {
+      message.error('导出失败：' + (error.message || '未知错误'));
+    }
+  };
+
   const columns = [
     {
       title: '记录编号',
       dataIndex: 'recordNo',
       key: 'recordNo',
       width: 150,
+      fixed: 'left' as const,
     },
     {
-      title: '订单编号',
-      dataIndex: 'orderNo',
-      key: 'orderNo',
+      title: '组别',
+      dataIndex: 'groupName',
+      key: 'groupName',
+      width: 100,
+    },
+    {
+      title: '机台号',
+      dataIndex: 'machineNo',
+      key: 'machineNo',
+      width: 120,
+    },
+    {
+      title: '设备型号',
+      dataIndex: 'equipmentModel',
+      key: 'equipmentModel',
       width: 150,
     },
     {
       title: '产品名称',
-      dataIndex: 'productName',
       key: 'productName',
-      width: 150,
-    },
-    {
-      title: '计划编号',
-      dataIndex: 'planNo',
-      key: 'planNo',
-      width: 150,
+      width: 200,
+      render: (_: any, record: ProductionRecordInfo) => {
+        if (record.products && record.products.length > 0) {
+          return record.products.map((p, idx) => (
+            <div key={idx} style={{ marginBottom: 4 }}>
+              <div>{p.productName}</div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                数量: {p.orderQuantity} | 产能: {p.dailyCapacity}/天 | 剩余: {p.remainingQuantity ?? p.orderQuantity}
+              </div>
+            </div>
+          ));
+        }
+        return record.productName || '-';
+      },
     },
     {
       title: '生产日期',
@@ -132,32 +171,12 @@ const RecordList: React.FC = () => {
       key: 'passRate',
       width: 100,
       render: (_: any, record: ProductionRecordInfo) => {
-        const total = record.quantity + record.defectQuantity;
+        const total = record.quantity + (record.defectQuantity || 0);
         const rate = total > 0 
           ? ((record.quantity / total) * 100).toFixed(1) 
           : '0.0';
         return `${rate}%`;
       },
-    },
-    {
-      title: '操作员',
-      dataIndex: 'operatorName',
-      key: 'operatorName',
-      width: 100,
-    },
-    {
-      title: '开始时间',
-      dataIndex: 'startTime',
-      key: 'startTime',
-      width: 180,
-      render: (text: string) => (text ? new Date(text).toLocaleString() : '-'),
-    },
-    {
-      title: '结束时间',
-      dataIndex: 'endTime',
-      key: 'endTime',
-      width: 180,
-      render: (text: string) => (text ? new Date(text).toLocaleString() : '-'),
     },
     {
       title: '操作',
@@ -178,6 +197,80 @@ const RecordList: React.FC = () => {
       ),
     },
   ];
+
+  // 展开行内容
+  const expandedRowRender = (record: ProductionRecordInfo) => {
+    return (
+      <div style={{ padding: '16px', background: '#fafafa' }}>
+        <Collapse defaultActiveKey={['equipment', 'product', 'schedule']}>
+          <Collapse.Panel header="设备详细信息" key="equipment">
+            <Descriptions column={3} bordered size="small">
+              <Descriptions.Item label="组别">{record.groupName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="机台号">{record.machineNo || '-'}</Descriptions.Item>
+              <Descriptions.Item label="设备编号">{record.equipmentNo || '-'}</Descriptions.Item>
+              <Descriptions.Item label="设备名称">{record.equipmentName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="设备型号">{record.equipmentModel || '-'}</Descriptions.Item>
+              <Descriptions.Item label="机械手型号">{record.robotModel || '-'}</Descriptions.Item>
+              <Descriptions.Item label="启用日期">{record.enableDate || '-'}</Descriptions.Item>
+              <Descriptions.Item label="使用年限">{record.serviceLife ? `${record.serviceLife}年` : '-'}</Descriptions.Item>
+              <Descriptions.Item label="模温机">{record.moldTempMachine || '-'}</Descriptions.Item>
+              <Descriptions.Item label="冻水机">{record.chiller || '-'}</Descriptions.Item>
+              <Descriptions.Item label="基本排模">{record.basicMold || '-'}</Descriptions.Item>
+              <Descriptions.Item label="备用排模1">{record.spareMold1 || '-'}</Descriptions.Item>
+              <Descriptions.Item label="备用排模2">{record.spareMold2 || '-'}</Descriptions.Item>
+              <Descriptions.Item label="备用排模3">{record.spareMold3 || '-'}</Descriptions.Item>
+            </Descriptions>
+          </Collapse.Panel>
+          
+          <Collapse.Panel header="产品信息" key="product">
+            {record.products && record.products.length > 0 ? (
+              <Table
+                dataSource={record.products}
+                columns={[
+                  { title: '产品名称', dataIndex: 'productName', key: 'productName' },
+                  { title: '产品编码', dataIndex: 'productCode', key: 'productCode' },
+                  { title: '订单数量', dataIndex: 'orderQuantity', key: 'orderQuantity' },
+                  { title: '产能', dataIndex: 'dailyCapacity', key: 'dailyCapacity' },
+                  { 
+                    title: '剩余数量', 
+                    key: 'remainingQuantity',
+                    render: (_: any, p: any) => p.remainingQuantity ?? p.orderQuantity
+                  },
+                ]}
+                pagination={false}
+                size="small"
+                rowKey={(_, index) => `product-${index}`}
+              />
+            ) : (
+              <div>暂无产品信息</div>
+            )}
+          </Collapse.Panel>
+          
+          <Collapse.Panel header="排程情况" key="schedule">
+            {record.schedules && record.schedules.length > 0 ? (
+              <Table
+                dataSource={record.schedules}
+                columns={[
+                  { title: '排程日期', dataIndex: 'scheduleDate', key: 'scheduleDate', width: 120 },
+                  { title: '第几天', dataIndex: 'dayNumber', key: 'dayNumber', width: 80 },
+                  { title: '产品名称', dataIndex: 'productName', key: 'productName', width: 150 },
+                  { title: '排产数量', dataIndex: 'productionQuantity', key: 'productionQuantity', width: 100 },
+                  { title: '产能', dataIndex: 'dailyCapacity', key: 'dailyCapacity', width: 100 },
+                  { title: '剩余数量', dataIndex: 'remainingQuantity', key: 'remainingQuantity', width: 100 },
+                ]}
+                pagination={false}
+                size="small"
+                rowKey={(_, index) => `schedule-${index}`}
+                scroll={{ x: 650 }}
+              />
+            ) : (
+              <div>暂无排程信息</div>
+            )}
+          </Collapse.Panel>
+        </Collapse>
+      </div>
+    );
+  };
 
   return (
     <div className="production-list-container">
@@ -213,6 +306,9 @@ const RecordList: React.FC = () => {
         <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
           新增记录
         </Button>
+        <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
+          导出Excel
+        </Button>
         <Button icon={<ReloadOutlined />} onClick={fetchList}>
           刷新
         </Button>
@@ -224,6 +320,10 @@ const RecordList: React.FC = () => {
         rowKey="id"
         loading={loading}
         scroll={{ x: 1600 }}
+        expandable={{
+          expandedRowRender,
+          rowExpandable: () => true,
+        }}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,

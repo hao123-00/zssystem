@@ -3,7 +3,6 @@ package com.zssystem.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -13,26 +12,15 @@ public class ProductionOrder {
     private Long id;
 
     @TableField("order_no")
-    private String orderNo;
+    private String orderNo; // 订单编号（唯一）
 
-    @TableField("customer_name")
-    private String customerName;
+    @TableField("machine_no")
+    private String machineNo; // 机台号
 
-    @TableField("product_name")
-    private String productName;
+    @TableField("equipment_id")
+    private Long equipmentId; // 设备ID（关联equipment表）
 
-    @TableField("product_code")
-    private String productCode;
-
-    private Integer quantity;
-
-    @TableField("completed_quantity")
-    private Integer completedQuantity;
-
-    @TableField("delivery_date")
-    private LocalDate deliveryDate;
-
-    private Integer status; // 0-待生产，1-生产中，2-已完成，3-已取消
+    private Integer status; // 0-待排程，1-排程中，2-已完成
 
     private String remark;
 

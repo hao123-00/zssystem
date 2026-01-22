@@ -24,6 +24,18 @@ public class ProductionRecord {
     @TableField("equipment_id")
     private Long equipmentId;
 
+    @TableField("equipment_no")
+    private String equipmentNo;
+
+    @TableField("schedule_id")
+    private Long scheduleId; // 排程ID（关联production_schedule）
+
+    @TableField("product_code")
+    private String productCode;
+
+    @TableField("product_name")
+    private String productName;
+
     @TableField("mold_id")
     private Long moldId;
 

@@ -16,4 +16,5 @@ public interface ProductionRecordService {
     void updateRecord(Long id, ProductionRecordSaveDTO saveDTO);
     void deleteRecord(Long id);
     List<ProductionStatisticsVO> getStatistics(String dimension, LocalDate startDate, LocalDate endDate);
+    List<com.zssystem.vo.excel.ProductionRecordExportVO> getExportData(ProductionRecordQueryDTO queryDTO);
 }

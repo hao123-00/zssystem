@@ -9,6 +9,7 @@ import {
   UsergroupAddOutlined,
   ApartmentOutlined,
   ShopOutlined,
+  ToolOutlined,
 } from '@ant-design/icons';
 import { logout } from '@/utils/auth';
 import './Layout.less';
@@ -54,6 +55,11 @@ const Layout: React.FC = () => {
       key: '/production',
       icon: <ShopOutlined />,
       label: '生产管理',
+    },
+    {
+      key: '/equipment',
+      icon: <ToolOutlined />,
+      label: '设备管理',
     },
   ];
 

@@ -7,10 +7,12 @@ import com.zssystem.dto.ProductionPlanQueryDTO;
 import com.zssystem.dto.ProductionPlanSaveDTO;
 import com.zssystem.entity.Employee;
 import com.zssystem.entity.ProductionOrder;
+import com.zssystem.entity.ProductionOrderProduct;
 import com.zssystem.entity.ProductionPlan;
 import com.zssystem.entity.ProductionRecord;
 import com.zssystem.mapper.EmployeeMapper;
 import com.zssystem.mapper.ProductionOrderMapper;
+import com.zssystem.mapper.ProductionOrderProductMapper;
 import com.zssystem.mapper.ProductionPlanMapper;
 import com.zssystem.mapper.ProductionRecordMapper;
 import com.zssystem.service.ProductionPlanService;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 public class ProductionPlanServiceImpl implements ProductionPlanService {
@@ -32,6 +35,9 @@ public class ProductionPlanServiceImpl implements ProductionPlanService {
 
     @Autowired
     private ProductionOrderMapper orderMapper;
+
+    @Autowired
+    private ProductionOrderProductMapper orderProductMapper;
 
     @Autowired
     private ProductionRecordMapper recordMapper;
@@ -55,14 +61,23 @@ public class ProductionPlanServiceImpl implements ProductionPlanService {
         IPage<ProductionPlan> planPage = planMapper.selectPage(page, wrapper);
         return planPage.convert(plan -> {
             ProductionPlanVO vo = BeanUtil.copyProperties(plan, ProductionPlanVO.class);
-            // 填充订单信息
-            if (plan.getOrderId() != null) {
-                ProductionOrder order = orderMapper.selectById(plan.getOrderId());
-                if (order != null) {
-                    vo.setOrderNo(order.getOrderNo());
-                    vo.setProductName(order.getProductName());
+        // 填充订单信息
+        if (plan.getOrderId() != null) {
+            ProductionOrder order = orderMapper.selectById(plan.getOrderId());
+            if (order != null) {
+                vo.setOrderNo(order.getOrderNo());
+                // 从订单产品表获取第一个产品名称
+                List<ProductionOrderProduct> products = orderProductMapper.selectList(
+                    new LambdaQueryWrapper<ProductionOrderProduct>()
+                        .eq(ProductionOrderProduct::getOrderId, order.getId())
+                        .orderByAsc(ProductionOrderProduct::getSortOrder)
+                        .last("LIMIT 1")
+                );
+                if (!products.isEmpty()) {
+                    vo.setProductName(products.get(0).getProductName());
                 }
             }
+        }
             // 填充操作员信息
             if (plan.getOperatorId() != null) {
                 Employee employee = employeeMapper.selectById(plan.getOperatorId());
@@ -90,7 +105,16 @@ public class ProductionPlanServiceImpl implements ProductionPlanService {
             ProductionOrder order = orderMapper.selectById(plan.getOrderId());
             if (order != null) {
                 vo.setOrderNo(order.getOrderNo());
-                vo.setProductName(order.getProductName());
+                // 从订单产品表获取第一个产品名称
+                List<ProductionOrderProduct> products = orderProductMapper.selectList(
+                    new LambdaQueryWrapper<ProductionOrderProduct>()
+                        .eq(ProductionOrderProduct::getOrderId, order.getId())
+                        .orderByAsc(ProductionOrderProduct::getSortOrder)
+                        .last("LIMIT 1")
+                );
+                if (!products.isEmpty()) {
+                    vo.setProductName(products.get(0).getProductName());
+                }
             }
         }
         // 填充操作员信息
