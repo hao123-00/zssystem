@@ -199,6 +199,42 @@ export const getScheduleByMachineNo = (machineNo: string, startDate?: string) =>
   });
 };
 
+export const exportSchedule = (params: ProductionScheduleQueryParams) => {
+  return request.get('/production/schedule/export', {
+    params,
+    responseType: 'blob',
+  });
+};
+
+export const deleteScheduleByMachineNo = (machineNo: string) => {
+  return request.delete<void>(`/production/schedule/machine/${machineNo}`);
+};
+
+export interface ProductionScheduleDetailInfo {
+  id: number;
+  machineNo: string;
+  equipmentId?: number;
+  equipmentNo?: string;
+  equipmentName?: string;
+  groupName?: string;
+  scheduleDate: string;
+  dayNumber: number;
+  productCode?: string;
+  productName: string;
+  productionQuantity: number;
+  dailyCapacity: number;
+  remainingQuantity: number;
+  orderId: number;
+}
+
+export const getScheduleDetailList = (params: ProductionScheduleQueryParams) => {
+  return request.get<ProductionScheduleDetailInfo[]>('/production/schedule/detail/list', { params });
+};
+
+export const deleteScheduleById = (id: number) => {
+  return request.delete<void>(`/production/schedule/${id}`);
+};
+
 // ========== 生产记录 API ==========
 export const getRecordList = (params: ProductionRecordQueryParams) => {
   return request.get<{

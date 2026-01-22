@@ -2,6 +2,7 @@ package com.zssystem.service;
 
 import com.zssystem.dto.ProductionScheduleQueryDTO;
 import com.zssystem.vo.ProductionScheduleVO;
+import com.zssystem.vo.excel.ProductionScheduleExportVO;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -29,4 +30,30 @@ public interface ProductionScheduleService {
      * @return 排程结果
      */
     ProductionScheduleVO getScheduleByMachineNo(String machineNo, LocalDate startDate);
+    
+    /**
+     * 获取导出数据
+     * @param queryDTO 查询条件
+     * @return 导出数据列表
+     */
+    List<ProductionScheduleExportVO> getExportData(ProductionScheduleQueryDTO queryDTO);
+    
+    /**
+     * 删除指定机台号的排程计划
+     * @param machineNo 机台号
+     */
+    void deleteScheduleByMachineNo(String machineNo);
+    
+    /**
+     * 删除单条排程记录
+     * @param id 排程记录ID
+     */
+    void deleteScheduleById(Long id);
+    
+    /**
+     * 查询所有排程记录（按日期列表）
+     * @param queryDTO 查询条件
+     * @return 排程记录列表
+     */
+    List<com.zssystem.vo.ProductionScheduleDetailVO> getScheduleDetailList(ProductionScheduleQueryDTO queryDTO);
 }

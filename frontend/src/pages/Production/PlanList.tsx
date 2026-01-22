@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Form, Input, DatePicker, Space, message, Tag, Card, Select } from 'antd';
-import { ReloadOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Form, Input, DatePicker, Space, message, Tag, Card, Select, Popconfirm } from 'antd';
+import { ReloadOutlined, PlayCircleOutlined, DownloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import {
   generateSchedule,
@@ -8,8 +8,11 @@ import {
   ProductionScheduleInfo,
   ProductionScheduleQueryParams,
   ScheduleDayInfo,
+  exportSchedule,
+  deleteScheduleByMachineNo,
 } from '@/api/production';
 import { getOrderList } from '@/api/production';
+import { exportExcel } from '@/utils/excel';
 import './ProductionList.less';
 
 const PlanList: React.FC = () => {
@@ -47,7 +50,9 @@ const PlanList: React.FC = () => {
         machineNo: values.machineNo,
         startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
       };
+      // 获取按机台号分组的排程列表
       const response = await getScheduleList(params);
+      
       // 确保 response 是数组
       if (Array.isArray(response)) {
         setScheduleList(response);
@@ -102,6 +107,37 @@ const PlanList: React.FC = () => {
       startDate: dayjs(),
     });
     fetchList();
+  };
+
+  const handleExport = async () => {
+    try {
+      const values = form.getFieldsValue();
+      if (!values.machineNo) {
+        message.warning('请先选择机台号');
+        return;
+      }
+      
+      const params: ProductionScheduleQueryParams = {
+        machineNo: values.machineNo,
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+      };
+      
+      const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const filename = `生产管理_生产计划排程_${date}`;
+      await exportExcel('/api/production/schedule/export', params, filename);
+    } catch (error: any) {
+      message.error('导出失败：' + (error.message || '未知错误'));
+    }
+  };
+
+  const handleDelete = async (machineNo: string) => {
+    try {
+      await deleteScheduleByMachineNo(machineNo);
+      message.success('删除排程成功');
+      fetchList();
+    } catch (error: any) {
+      message.error(error.message || '删除排程失败');
+    }
   };
 
   // 构建表格列（动态日期列）
@@ -210,6 +246,14 @@ const PlanList: React.FC = () => {
           >
             生成排程
           </Button>
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+            disabled={scheduleList.length === 0}
+          >
+            导出Excel
+          </Button>
           <Button icon={<ReloadOutlined />} onClick={fetchList} loading={loading}>
             刷新
           </Button>
@@ -249,6 +293,21 @@ const PlanList: React.FC = () => {
                   >
                     重新生成
                   </Button>
+                  <Popconfirm
+                    title="确定要删除该机台号的所有排程计划吗？"
+                    onConfirm={() => handleDelete(schedule.machineNo)}
+                    okText="确定"
+                    cancelText="取消"
+                  >
+                    <Button
+                      type="primary"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                    >
+                      删除
+                    </Button>
+                  </Popconfirm>
                 </Space>
               }
               style={{ marginBottom: 16 }}

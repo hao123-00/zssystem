@@ -3,7 +3,10 @@ package com.zssystem.controller;
 import com.zssystem.common.Result;
 import com.zssystem.dto.ProductionScheduleQueryDTO;
 import com.zssystem.service.ProductionScheduleService;
+import com.zssystem.util.ExcelUtil;
 import com.zssystem.vo.ProductionScheduleVO;
+import com.zssystem.vo.ProductionScheduleDetailVO;
+import com.zssystem.vo.excel.ProductionScheduleExportVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -45,5 +48,30 @@ public class ProductionScheduleController {
         }
         ProductionScheduleVO vo = scheduleService.getScheduleByMachineNo(machineNo, startDate);
         return Result.success(vo);
+    }
+
+    @GetMapping("/export")
+    public void exportSchedule(@Validated ProductionScheduleQueryDTO queryDTO) {
+        List<ProductionScheduleExportVO> exportData = scheduleService.getExportData(queryDTO);
+        String fileName = ExcelUtil.generateFileName("生产管理_生产计划排程");
+        ExcelUtil.exportExcel(exportData, fileName, "生产计划排程", ProductionScheduleExportVO.class);
+    }
+
+    @DeleteMapping("/machine/{machineNo}")
+    public Result<Void> deleteScheduleByMachineNo(@PathVariable String machineNo) {
+        scheduleService.deleteScheduleByMachineNo(machineNo);
+        return Result.success();
+    }
+
+    @DeleteMapping("/{id}")
+    public Result<Void> deleteScheduleById(@PathVariable Long id) {
+        scheduleService.deleteScheduleById(id);
+        return Result.success();
+    }
+
+    @GetMapping("/detail/list")
+    public Result<List<ProductionScheduleDetailVO>> getScheduleDetailList(@Validated ProductionScheduleQueryDTO queryDTO) {
+        List<ProductionScheduleDetailVO> list = scheduleService.getScheduleDetailList(queryDTO);
+        return Result.success(list);
     }
 }

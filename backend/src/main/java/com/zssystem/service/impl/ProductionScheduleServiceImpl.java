@@ -13,7 +13,9 @@ import com.zssystem.mapper.ProductionScheduleMapper;
 import com.zssystem.service.ProductionScheduleService;
 import com.zssystem.util.BeanUtil;
 import com.zssystem.vo.ProductionScheduleVO;
+import com.zssystem.vo.ProductionScheduleDetailVO;
 import com.zssystem.vo.ScheduleDayVO;
+import com.zssystem.vo.excel.ProductionScheduleExportVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,9 +77,10 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
             throw new RuntimeException("该机台号的订单未配置产品");
         }
         
-        // 4. 删除该机台号旧的排程记录
-        scheduleMapper.delete(new LambdaQueryWrapper<ProductionSchedule>()
-            .eq(ProductionSchedule::getMachineNo, machineNo));
+        // 4. 物理删除该机台号旧的排程记录
+        // 由于唯一约束 uk_equipment_day (equipment_id, day_number) 不包含 deleted 字段，
+        // 逻辑删除的记录仍然会被唯一约束检查，所以需要使用物理删除
+        scheduleMapper.physicalDeleteByMachineNo(machineNo);
         
         // 5. 生成排程（避开星期天）
         List<ScheduleDayVO> scheduleDays = new ArrayList<>();
@@ -87,60 +90,45 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
         int remainingQuantity = currentProduct.getOrderQuantity();
         int dayNumber = 0; // 排程天数（排除星期天）
         LocalDate currentDate = startDate;
+        boolean allProductsCompleted = false; // 标记所有产品是否完成
         
         // 持续生成排程，直到所有产品完成或达到最大天数限制
-        int maxDays = 100; // 最大排程天数限制，避免无限循环
+        // 一个月约30天，去掉星期日后约26天，设置为30天以确保覆盖一个月
+        int maxDays = 30; // 最大排程天数限制（一个月，去掉星期日）
         while (dayNumber < maxDays && currentProductIndex < allProducts.size()) {
-            // 判断是否为星期天，如果是则跳过
+            // 先计算当前产品的剩余数量
+            remainingQuantity = currentProduct.getOrderQuantity() - 
+                               (currentProduct.getDailyCapacity() * currentProductDays);
+            
+            // 如果剩余数量 <= 0，不另算一天进行排程，直接切换到下一个产品
+            if (remainingQuantity <= 0) {
+                if (currentProductIndex < allProducts.size() - 1) {
+                    // 切换到下一个产品
+                    currentProductIndex++;
+                    currentProduct = allProducts.get(currentProductIndex);
+                    currentProductDays = 0;
+                    remainingQuantity = currentProduct.getOrderQuantity();
+                    // 继续循环，不增加dayNumber，不创建排程记录
+                    continue;
+                } else {
+                    // 最后一个产品的剩余数量 <= 0，所有产品已完成
+                    allProductsCompleted = true;
+                    break;
+                }
+            }
+            
+            // 判断是否为星期天，如果是则跳过（不插入数据库记录，避免唯一约束冲突）
             DayOfWeek dayOfWeek = currentDate.getDayOfWeek();
             if (dayOfWeek == DayOfWeek.SUNDAY) {
-                // 记录跳过的星期天（不增加dayNumber，因为星期天不计入排程天数）
-                ProductionSchedule skipSchedule = new ProductionSchedule();
-                skipSchedule.setMachineNo(machineNo);
-                skipSchedule.setScheduleDate(currentDate);
-                skipSchedule.setIsSunday(1);
-                skipSchedule.setDayNumber(0); // 星期天不计入排程天数，设置为0或-1表示跳过
-                // 设置必需的字段，避免数据库约束错误
-                skipSchedule.setProductName("-"); // 星期天不生产，设置为占位符
-                skipSchedule.setProductionQuantity(0);
-                skipSchedule.setDailyCapacity(0);
-                skipSchedule.setRemainingQuantity(0);
-                // 如果有当前产品，使用当前产品的订单ID，否则使用第一个产品的订单ID
-                if (currentProduct != null) {
-                    skipSchedule.setOrderId(currentProduct.getOrderId());
-                } else if (!allProducts.isEmpty()) {
-                    skipSchedule.setOrderId(allProducts.get(0).getOrderId());
-                }
-                if (equipment != null) {
-                    skipSchedule.setEquipmentId(equipment.getId());
-                    skipSchedule.setEquipmentNo(equipment.getEquipmentNo());
-                }
-                scheduleMapper.insert(skipSchedule);
-                
+                // 星期天不计入排程天数，直接跳过，不插入数据库记录
+                // 这样可以避免 uk_equipment_day (equipment_id, day_number) 唯一约束冲突
                 currentDate = currentDate.plusDays(1);
                 continue;
             }
             
             dayNumber++;
             
-            // 计算剩余数量：剩余数量 = 订单数量 - 产能 × 已生产天数
-            remainingQuantity = currentProduct.getOrderQuantity() - 
-                               (currentProduct.getDailyCapacity() * currentProductDays);
-            
-            // 如果剩余数量 <= 0，切换到下一个产品
-            if (remainingQuantity <= 0) {
-                if (currentProductIndex < allProducts.size() - 1) {
-                    currentProductIndex++;
-                    currentProduct = allProducts.get(currentProductIndex);
-                    currentProductDays = 0;
-                    remainingQuantity = currentProduct.getOrderQuantity();
-                } else {
-                    // 所有产品已完成，退出循环
-                    break;
-                }
-            }
-            
-            // 创建排程记录
+            // 创建排程记录（剩余数量>0时才创建）
             ProductionSchedule schedule = new ProductionSchedule();
             schedule.setMachineNo(machineNo);
             if (equipment != null) {
@@ -173,8 +161,23 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
         }
         
         // 6. 判断是否能在指定时间内完成所有产品的生产目标
-        boolean canComplete = currentProductIndex >= allProducts.size() - 1 && 
-                             (currentProductIndex == allProducts.size() - 1 ? remainingQuantity <= 0 : true);
+        boolean canComplete = false;
+        if (allProductsCompleted) {
+            // 所有产品都已完成，计划完成
+            canComplete = true;
+        } else {
+            // 计算所有产品的总需求天数（排除星期天）
+            int totalRequiredDays = 0;
+            for (ProductionOrderProduct product : allProducts) {
+                if (product.getDailyCapacity() > 0) {
+                    // 向上取整：需要的天数 = (订单数量 + 产能 - 1) / 产能
+                    int daysNeeded = (product.getOrderQuantity() + product.getDailyCapacity() - 1) / product.getDailyCapacity();
+                    totalRequiredDays += daysNeeded;
+                }
+            }
+            // 判断在最大天数内是否能完成
+            canComplete = totalRequiredDays <= maxDays;
+        }
         
         // 6. 构建返回VO
         ProductionScheduleVO vo = new ProductionScheduleVO();
@@ -194,21 +197,29 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
 
     @Override
     public List<ProductionScheduleVO> getScheduleList(ProductionScheduleQueryDTO queryDTO) {
-        // 查询符合条件的机台号
-        LambdaQueryWrapper<ProductionOrder> orderWrapper = new LambdaQueryWrapper<>();
-        orderWrapper.eq(queryDTO.getMachineNo() != null && !queryDTO.getMachineNo().isBlank(),
-                        ProductionOrder::getMachineNo, queryDTO.getMachineNo());
+        // 查询所有有排程记录的机台号（从排程表中查询，而不是从订单表）
+        LambdaQueryWrapper<ProductionSchedule> scheduleWrapper = new LambdaQueryWrapper<>();
+        if (queryDTO.getMachineNo() != null && !queryDTO.getMachineNo().isBlank()) {
+            scheduleWrapper.eq(ProductionSchedule::getMachineNo, queryDTO.getMachineNo());
+        }
+        if (queryDTO.getStartDate() != null) {
+            scheduleWrapper.ge(ProductionSchedule::getScheduleDate, queryDTO.getStartDate());
+        }
         
-        List<ProductionOrder> orders = orderMapper.selectList(orderWrapper);
-        
-        // 获取唯一的机台号列表
-        List<String> machineNos = orders.stream()
-            .map(ProductionOrder::getMachineNo)
+        // 获取唯一的机台号列表（从排程表中）
+        List<ProductionSchedule> allSchedules = scheduleMapper.selectList(scheduleWrapper);
+        List<String> machineNos = allSchedules.stream()
+            .map(ProductionSchedule::getMachineNo)
             .distinct()
             .collect(Collectors.toList());
         
+        if (machineNos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
         LocalDate startDate = queryDTO.getStartDate() != null ? queryDTO.getStartDate() : LocalDate.now();
         
+        // 为每个机台号生成排程VO
         return machineNos.stream().map(machineNo -> {
             return getScheduleByMachineNo(machineNo, startDate);
         }).collect(Collectors.toList());
@@ -222,12 +233,12 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
                 .eq(Equipment::getMachineNo, machineNo)
         );
         
-        // 查询该机台号的排程（排除星期天）
+        // 查询该机台号的排程（显示所有排程记录，按日期排序）
         List<ProductionSchedule> schedules = scheduleMapper.selectList(
             new LambdaQueryWrapper<ProductionSchedule>()
                 .eq(ProductionSchedule::getMachineNo, machineNo)
-                .eq(ProductionSchedule::getIsSunday, 0) // 排除星期天
                 .ge(startDate != null, ProductionSchedule::getScheduleDate, startDate)
+                .orderByAsc(ProductionSchedule::getScheduleDate)
                 .orderByAsc(ProductionSchedule::getDayNumber)
         );
         
@@ -259,13 +270,44 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
             return dayVO;
         }).collect(Collectors.toList());
         
-        // 判断是否完成目标（检查所有订单是否都能完成）
-        boolean canComplete = true;
+        // 判断是否完成目标
+        boolean canComplete = false;
         if (!scheduleDays.isEmpty()) {
             // 检查最后一个排程的剩余数量
             ScheduleDayVO lastDay = scheduleDays.get(scheduleDays.size() - 1);
-            if (lastDay.getRemainingQuantity() > 0) {
-                canComplete = false;
+            // 如果最后一个排程的剩余数量 <= 0，说明所有产品都已完成
+            if (lastDay.getRemainingQuantity() <= 0) {
+                canComplete = true;
+            } else {
+                // 如果还有剩余数量，计算所有产品的总需求天数
+                // 查询该机台号的所有订单产品
+                List<ProductionOrder> orders = orderMapper.selectList(
+                    new LambdaQueryWrapper<ProductionOrder>()
+                        .eq(ProductionOrder::getMachineNo, machineNo)
+                        .in(ProductionOrder::getStatus, 0, 1)
+                );
+                
+                List<ProductionOrderProduct> allProducts = new ArrayList<>();
+                for (ProductionOrder order : orders) {
+                    List<ProductionOrderProduct> products = orderProductMapper.selectList(
+                        new LambdaQueryWrapper<ProductionOrderProduct>()
+                            .eq(ProductionOrderProduct::getOrderId, order.getId())
+                            .orderByAsc(ProductionOrderProduct::getSortOrder)
+                    );
+                    allProducts.addAll(products);
+                }
+                
+                // 计算总需求天数
+                int totalRequiredDays = 0;
+                for (ProductionOrderProduct product : allProducts) {
+                    if (product.getDailyCapacity() > 0) {
+                        int daysNeeded = (product.getOrderQuantity() + product.getDailyCapacity() - 1) / product.getDailyCapacity();
+                        totalRequiredDays += daysNeeded;
+                    }
+                }
+                
+                // 判断在30天内是否能完成
+                canComplete = totalRequiredDays <= 30;
             }
         }
         
@@ -282,5 +324,256 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
         vo.setCanCompleteTarget(canComplete);
         
         return vo;
+    }
+
+    @Override
+    public List<ProductionScheduleExportVO> getExportData(ProductionScheduleQueryDTO queryDTO) {
+        // 查询符合条件的排程
+        List<ProductionScheduleVO> scheduleList = getScheduleList(queryDTO);
+        
+        List<ProductionScheduleExportVO> exportList = new ArrayList<>();
+        
+        for (ProductionScheduleVO scheduleVO : scheduleList) {
+            // 查询设备信息
+            Equipment equipment = null;
+            if (scheduleVO.getEquipmentId() != null) {
+                equipment = equipmentMapper.selectById(scheduleVO.getEquipmentId());
+            } else if (scheduleVO.getMachineNo() != null) {
+                equipment = equipmentMapper.selectOne(
+                    new LambdaQueryWrapper<Equipment>()
+                        .eq(Equipment::getMachineNo, scheduleVO.getMachineNo())
+                );
+            }
+            
+            // 查询订单产品信息
+            List<ProductionOrderProduct> products = new ArrayList<>();
+            if (scheduleVO.getMachineNo() != null) {
+                // 查询该机台号的所有订单
+                List<ProductionOrder> orders = orderMapper.selectList(
+                    new LambdaQueryWrapper<ProductionOrder>()
+                        .eq(ProductionOrder::getMachineNo, scheduleVO.getMachineNo())
+                        .in(ProductionOrder::getStatus, 0, 1)
+                );
+                
+                for (ProductionOrder order : orders) {
+                    List<ProductionOrderProduct> orderProducts = orderProductMapper.selectList(
+                        new LambdaQueryWrapper<ProductionOrderProduct>()
+                            .eq(ProductionOrderProduct::getOrderId, order.getId())
+                            .orderByAsc(ProductionOrderProduct::getSortOrder)
+                    );
+                    products.addAll(orderProducts);
+                }
+            }
+            
+            // 查询排程详情（最多30天，排除星期天）
+            List<ProductionSchedule> allSchedules = scheduleMapper.selectList(
+                new LambdaQueryWrapper<ProductionSchedule>()
+                    .eq(ProductionSchedule::getMachineNo, scheduleVO.getMachineNo())
+                    .eq(ProductionSchedule::getIsSunday, 0)
+                    .orderByAsc(ProductionSchedule::getScheduleDate)
+                    .last("LIMIT 30")
+            );
+            
+            // 为每个产品创建一行导出数据
+            if (products.isEmpty() && !allSchedules.isEmpty()) {
+                // 如果没有产品信息，但从排程中获取产品名称（去重）
+                java.util.Set<String> productNames = allSchedules.stream()
+                    .map(ProductionSchedule::getProductName)
+                    .filter(name -> name != null && !name.equals("-"))
+                    .collect(java.util.stream.Collectors.toSet());
+                
+                for (String productName : productNames) {
+                    List<ProductionSchedule> productSchedules = allSchedules.stream()
+                        .filter(s -> productName.equals(s.getProductName()))
+                        .collect(Collectors.toList());
+                    
+                    ProductionScheduleExportVO exportVO = createExportVO(
+                        equipment, productName, null, null, productSchedules
+                    );
+                    exportList.add(exportVO);
+                }
+            } else if (!products.isEmpty()) {
+                // 为每个产品创建一行
+                for (ProductionOrderProduct product : products) {
+                    // 过滤出该产品的排程
+                    List<ProductionSchedule> productSchedules = allSchedules.stream()
+                        .filter(s -> product.getProductName().equals(s.getProductName()))
+                        .collect(Collectors.toList());
+                    
+                    ProductionScheduleExportVO exportVO = createExportVO(
+                        equipment,
+                        product.getProductName(),
+                        product.getOrderQuantity(),
+                        product.getDailyCapacity(),
+                        productSchedules
+                    );
+                    exportList.add(exportVO);
+                }
+            } else {
+                // 如果既没有产品也没有排程，至少创建一行设备信息
+                ProductionScheduleExportVO exportVO = createExportVO(
+                    equipment, "-", null, null, new ArrayList<>()
+                );
+                exportList.add(exportVO);
+            }
+        }
+        
+        return exportList;
+    }
+    
+    private ProductionScheduleExportVO createExportVO(
+            Equipment equipment,
+            String productName,
+            Integer orderQuantity,
+            Integer dailyCapacity,
+            List<ProductionSchedule> schedules) {
+        ProductionScheduleExportVO exportVO = new ProductionScheduleExportVO();
+        
+        // 填充设备信息
+        if (equipment != null) {
+            exportVO.setGroupName(equipment.getGroupName() != null ? equipment.getGroupName() : "-");
+            exportVO.setMachineNo(equipment.getMachineNo() != null ? equipment.getMachineNo() : "-");
+            exportVO.setEquipmentModel(equipment.getEquipmentModel() != null ? equipment.getEquipmentModel() : "-");
+            exportVO.setRobotModel(equipment.getRobotModel() != null ? equipment.getRobotModel() : "-");
+            exportVO.setEnableDate(equipment.getEnableDate() != null ? 
+                equipment.getEnableDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) : "-");
+            exportVO.setServiceLife(equipment.getServiceLife() != null ? equipment.getServiceLife() + "年" : "-");
+            exportVO.setMoldTempMachine(equipment.getMoldTempMachine() != null ? equipment.getMoldTempMachine() : "-");
+            exportVO.setChiller(equipment.getChiller() != null ? equipment.getChiller() : "-");
+            exportVO.setBasicMold(equipment.getBasicMold() != null ? equipment.getBasicMold() : "-");
+            exportVO.setSpareMold1(equipment.getSpareMold1() != null ? equipment.getSpareMold1() : "-");
+            exportVO.setSpareMold2(equipment.getSpareMold2() != null ? equipment.getSpareMold2() : "-");
+            exportVO.setSpareMold3(equipment.getSpareMold3() != null ? equipment.getSpareMold3() : "-");
+        } else {
+            exportVO.setGroupName("-");
+            exportVO.setMachineNo("-");
+            exportVO.setEquipmentModel("-");
+            exportVO.setRobotModel("-");
+            exportVO.setEnableDate("-");
+            exportVO.setServiceLife("-");
+            exportVO.setMoldTempMachine("-");
+            exportVO.setChiller("-");
+            exportVO.setBasicMold("-");
+            exportVO.setSpareMold1("-");
+            exportVO.setSpareMold2("-");
+            exportVO.setSpareMold3("-");
+        }
+        
+        // 填充产品信息
+        exportVO.setProductName(productName != null ? productName : "-");
+        exportVO.setOrderQuantity(orderQuantity != null ? String.valueOf(orderQuantity) : "-");
+        exportVO.setDailyCapacity(dailyCapacity != null ? String.valueOf(dailyCapacity) : "-");
+        
+        // 填充每天的排程情况
+        java.util.Map<Integer, ProductionSchedule> scheduleMap = schedules.stream()
+            .collect(Collectors.toMap(
+                ProductionSchedule::getDayNumber,
+                s -> s,
+                (existing, replacement) -> existing
+            ));
+        
+        // 设置30天的排程数据（排除星期天后的天数）
+        for (int day = 1; day <= 30; day++) {
+            ProductionSchedule schedule = scheduleMap.get(day);
+            String dayValue = "-";
+            if (schedule != null && !schedule.getProductName().equals("-")) {
+                // 格式：产品名称 / 排产数量 / 剩余数量
+                dayValue = String.format("%s / %d / %d",
+                    schedule.getProductName(),
+                    schedule.getProductionQuantity(),
+                    schedule.getRemainingQuantity());
+            }
+            
+            switch (day) {
+                case 1: exportVO.setDay1(dayValue); break;
+                case 2: exportVO.setDay2(dayValue); break;
+                case 3: exportVO.setDay3(dayValue); break;
+                case 4: exportVO.setDay4(dayValue); break;
+                case 5: exportVO.setDay5(dayValue); break;
+                case 6: exportVO.setDay6(dayValue); break;
+                case 7: exportVO.setDay7(dayValue); break;
+                case 8: exportVO.setDay8(dayValue); break;
+                case 9: exportVO.setDay9(dayValue); break;
+                case 10: exportVO.setDay10(dayValue); break;
+                case 11: exportVO.setDay11(dayValue); break;
+                case 12: exportVO.setDay12(dayValue); break;
+                case 13: exportVO.setDay13(dayValue); break;
+                case 14: exportVO.setDay14(dayValue); break;
+                case 15: exportVO.setDay15(dayValue); break;
+                case 16: exportVO.setDay16(dayValue); break;
+                case 17: exportVO.setDay17(dayValue); break;
+                case 18: exportVO.setDay18(dayValue); break;
+                case 19: exportVO.setDay19(dayValue); break;
+                case 20: exportVO.setDay20(dayValue); break;
+                case 21: exportVO.setDay21(dayValue); break;
+                case 22: exportVO.setDay22(dayValue); break;
+                case 23: exportVO.setDay23(dayValue); break;
+                case 24: exportVO.setDay24(dayValue); break;
+                case 25: exportVO.setDay25(dayValue); break;
+                case 26: exportVO.setDay26(dayValue); break;
+                case 27: exportVO.setDay27(dayValue); break;
+                case 28: exportVO.setDay28(dayValue); break;
+                case 29: exportVO.setDay29(dayValue); break;
+                case 30: exportVO.setDay30(dayValue); break;
+            }
+        }
+        
+        return exportVO;
+    }
+
+    @Override
+    @Transactional
+    public void deleteScheduleByMachineNo(String machineNo) {
+        scheduleMapper.physicalDeleteByMachineNo(machineNo);
+    }
+
+    @Override
+    @Transactional
+    public void deleteScheduleById(Long id) {
+        scheduleMapper.deleteById(id);
+    }
+
+    @Override
+    public List<ProductionScheduleDetailVO> getScheduleDetailList(ProductionScheduleQueryDTO queryDTO) {
+        // 构建查询条件
+        LambdaQueryWrapper<ProductionSchedule> wrapper = new LambdaQueryWrapper<>();
+        if (queryDTO.getMachineNo() != null && !queryDTO.getMachineNo().isBlank()) {
+            wrapper.eq(ProductionSchedule::getMachineNo, queryDTO.getMachineNo());
+        }
+        if (queryDTO.getStartDate() != null) {
+            wrapper.ge(ProductionSchedule::getScheduleDate, queryDTO.getStartDate());
+        }
+        wrapper.orderByAsc(ProductionSchedule::getScheduleDate)
+               .orderByAsc(ProductionSchedule::getDayNumber);
+        
+        List<ProductionSchedule> schedules = scheduleMapper.selectList(wrapper);
+        
+        // 转换为DetailVO
+        return schedules.stream().map(schedule -> {
+            ProductionScheduleDetailVO vo = new ProductionScheduleDetailVO();
+            vo.setId(schedule.getId());
+            vo.setMachineNo(schedule.getMachineNo());
+            vo.setEquipmentId(schedule.getEquipmentId());
+            vo.setEquipmentNo(schedule.getEquipmentNo());
+            vo.setScheduleDate(schedule.getScheduleDate());
+            vo.setDayNumber(schedule.getDayNumber());
+            vo.setProductCode(schedule.getProductCode());
+            vo.setProductName(schedule.getProductName());
+            vo.setProductionQuantity(schedule.getProductionQuantity());
+            vo.setDailyCapacity(schedule.getDailyCapacity());
+            vo.setRemainingQuantity(schedule.getRemainingQuantity());
+            vo.setOrderId(schedule.getOrderId());
+            
+            // 查询设备信息
+            if (schedule.getEquipmentId() != null) {
+                Equipment equipment = equipmentMapper.selectById(schedule.getEquipmentId());
+                if (equipment != null) {
+                    vo.setEquipmentName(equipment.getEquipmentName());
+                    vo.setGroupName(equipment.getGroupName());
+                }
+            }
+            
+            return vo;
+        }).collect(Collectors.toList());
     }
 }

@@ -11,17 +11,20 @@ import com.zssystem.entity.ProductionOrderProduct;
 import com.zssystem.mapper.EquipmentMapper;
 import com.zssystem.mapper.ProductionOrderMapper;
 import com.zssystem.mapper.ProductionOrderProductMapper;
+import com.zssystem.mapper.ProductionScheduleMapper;
 import com.zssystem.service.ProductionOrderService;
 import com.zssystem.util.BeanUtil;
 import com.zssystem.util.CodeGenerator;
 import com.zssystem.vo.ProductionOrderVO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -35,6 +38,9 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
 
     @Autowired
     private ProductionOrderProductMapper orderProductMapper;
+
+    @Autowired
+    private ProductionScheduleMapper scheduleMapper;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -149,28 +155,42 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
         );
         
         // 生成订单编号（避免并发重复）
-        String datePrefix = "ORDER" + LocalDate.now().format(DATE_FORMATTER);
-        String maxOrderNo = orderMapper.getMaxOrderNoByPrefix(datePrefix);
-        int sequence = 1;
-        if (maxOrderNo != null && maxOrderNo.startsWith(datePrefix)) {
-            // 提取序号：ORDER20260122 + 001 -> 提取 001
-            String seqStr = maxOrderNo.substring(datePrefix.length());
-            try {
-                sequence = Integer.parseInt(seqStr) + 1;
-            } catch (NumberFormatException e) {
-                sequence = 1;
+        // 使用重试机制，如果插入失败（唯一约束冲突），重新生成编号
+        String orderNo = null;
+        int maxRetries = 20;
+        int retryCount = 0;
+        
+        while (orderNo == null && retryCount < maxRetries) {
+            String datePrefix = "ORDER" + LocalDate.now().format(DATE_FORMATTER);
+            String maxOrderNo = orderMapper.getMaxOrderNoByPrefix(datePrefix);
+            int sequence = 1;
+            if (maxOrderNo != null && maxOrderNo.startsWith(datePrefix)) {
+                // 提取序号：ORDER20260122 + 001 -> 提取 001
+                String seqStr = maxOrderNo.substring(datePrefix.length());
+                try {
+                    sequence = Integer.parseInt(seqStr) + 1;
+                } catch (NumberFormatException e) {
+                    sequence = 1;
+                }
+            }
+            
+            // 生成订单编号
+            orderNo = CodeGenerator.generateOrderNo(sequence);
+            
+            // 检查订单编号是否已存在（包括已删除的记录，因为唯一约束会检查所有记录）
+            ProductionOrder existingOrder = orderMapper.selectByOrderNoIgnoreDeleted(orderNo);
+            if (existingOrder != null) {
+                // 如果已存在，递增序号重试
+                sequence++;
+                orderNo = CodeGenerator.generateOrderNo(sequence);
+                retryCount++;
+            } else {
+                // 编号可用，退出循环
+                break;
             }
         }
-        String orderNo = CodeGenerator.generateOrderNo(sequence);
         
-        // 检查订单编号是否已存在（双重检查，防止并发）
-        int retryCount = 0;
-        while (orderMapper.selectByOrderNo(orderNo) != null && retryCount < 10) {
-            sequence++;
-            orderNo = CodeGenerator.generateOrderNo(sequence);
-            retryCount++;
-        }
-        if (retryCount >= 10) {
+        if (orderNo == null || retryCount >= maxRetries) {
             throw new RuntimeException("生成订单编号失败，请稍后重试");
         }
 
@@ -187,7 +207,28 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
         if (order.getStatus() == null) {
             order.setStatus(0); // 默认待排程
         }
-        orderMapper.insert(order);
+        
+        // 插入订单，如果失败（唯一约束冲突），重试
+        try {
+            orderMapper.insert(order);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // 如果插入失败，重新生成订单编号并重试
+            String datePrefix = "ORDER" + LocalDate.now().format(DATE_FORMATTER);
+            String maxOrderNo = orderMapper.getMaxOrderNoByPrefix(datePrefix);
+            int sequence = 1;
+            if (maxOrderNo != null && maxOrderNo.startsWith(datePrefix)) {
+                String seqStr = maxOrderNo.substring(datePrefix.length());
+                try {
+                    sequence = Integer.parseInt(seqStr) + 1;
+                } catch (NumberFormatException ex) {
+                    sequence = 1;
+                }
+            }
+            // 再次尝试生成并插入
+            orderNo = CodeGenerator.generateOrderNo(sequence);
+            order.setOrderNo(orderNo);
+            orderMapper.insert(order);
+        }
         
         // 保存产品列表
         if (saveDTO.getProducts() != null && !saveDTO.getProducts().isEmpty()) {
@@ -261,6 +302,8 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
             throw new RuntimeException("订单不存在");
         }
 
+        String machineNo = order.getMachineNo();
+
         // 删除关联的产品记录
         LambdaQueryWrapper<ProductionOrderProduct> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(ProductionOrderProduct::getOrderId, id);
@@ -268,6 +311,18 @@ public class ProductionOrderServiceImpl implements ProductionOrderService {
         
         // 删除订单
         orderMapper.deleteById(id);
+        
+        // 检查该机台号是否还有其他订单
+        List<ProductionOrder> remainingOrders = orderMapper.selectList(
+            new LambdaQueryWrapper<ProductionOrder>()
+                .eq(ProductionOrder::getMachineNo, machineNo)
+                .in(ProductionOrder::getStatus, 0, 1)
+        );
+        
+        // 如果该机台号没有其他订单了，删除对应的排程计划
+        if (remainingOrders.isEmpty() && machineNo != null) {
+            scheduleMapper.physicalDeleteByMachineNo(machineNo);
+        }
     }
 
     @Override
