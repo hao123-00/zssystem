@@ -217,7 +217,7 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
             return new ArrayList<>();
         }
         
-        LocalDate startDate = queryDTO.getStartDate() != null ? queryDTO.getStartDate() : LocalDate.now();
+        LocalDate startDate = queryDTO.getStartDate();
         
         // 为每个机台号生成排程VO
         return machineNos.stream().map(machineNo -> {
@@ -234,13 +234,15 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
         );
         
         // 查询该机台号的排程（显示所有排程记录，按日期排序）
-        List<ProductionSchedule> schedules = scheduleMapper.selectList(
-            new LambdaQueryWrapper<ProductionSchedule>()
-                .eq(ProductionSchedule::getMachineNo, machineNo)
-                .ge(startDate != null, ProductionSchedule::getScheduleDate, startDate)
-                .orderByAsc(ProductionSchedule::getScheduleDate)
-                .orderByAsc(ProductionSchedule::getDayNumber)
-        );
+        LambdaQueryWrapper<ProductionSchedule> scheduleWrapper = new LambdaQueryWrapper<>();
+        scheduleWrapper.eq(ProductionSchedule::getMachineNo, machineNo);
+        if (startDate != null) {
+            scheduleWrapper.ge(ProductionSchedule::getScheduleDate, startDate);
+        }
+        scheduleWrapper.orderByAsc(ProductionSchedule::getScheduleDate)
+               .orderByAsc(ProductionSchedule::getDayNumber);
+        
+        List<ProductionSchedule> schedules = scheduleMapper.selectList(scheduleWrapper);
         
         if (schedules.isEmpty()) {
             // 如果没有排程，返回空VO
@@ -328,105 +330,60 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
 
     @Override
     public List<ProductionScheduleExportVO> getExportData(ProductionScheduleQueryDTO queryDTO) {
-        // 查询符合条件的排程
-        List<ProductionScheduleVO> scheduleList = getScheduleList(queryDTO);
+        // 获取排程开始日期（用于过滤和生成日期列）
+        if (queryDTO.getStartDate() == null) {
+            throw new RuntimeException("排程开始日期不能为空");
+        }
+        LocalDate startDate = queryDTO.getStartDate();
+        
+        // 查询所有符合排程开始日期的排程记录（按机台号分组）
+        LambdaQueryWrapper<ProductionSchedule> scheduleWrapper = new LambdaQueryWrapper<>();
+        if (queryDTO.getMachineNo() != null && !queryDTO.getMachineNo().isBlank()) {
+            scheduleWrapper.eq(ProductionSchedule::getMachineNo, queryDTO.getMachineNo());
+        }
+        // 按排程开始日期过滤：只导出排程日期 >= 开始日期的记录
+        scheduleWrapper.ge(ProductionSchedule::getScheduleDate, startDate);
+        
+        // 获取所有符合条件的排程记录
+        List<ProductionSchedule> allSchedules = scheduleMapper.selectList(scheduleWrapper);
+        
+        // 按机台号分组
+        java.util.Map<String, List<ProductionSchedule>> schedulesByMachine = allSchedules.stream()
+            .collect(Collectors.groupingBy(ProductionSchedule::getMachineNo));
         
         List<ProductionScheduleExportVO> exportList = new ArrayList<>();
         
-        for (ProductionScheduleVO scheduleVO : scheduleList) {
+        // 为每个机台号创建一行导出数据
+        for (java.util.Map.Entry<String, List<ProductionSchedule>> entry : schedulesByMachine.entrySet()) {
+            String machineNo = entry.getKey();
+            List<ProductionSchedule> machineSchedules = entry.getValue();
+            
             // 查询设备信息
-            Equipment equipment = null;
-            if (scheduleVO.getEquipmentId() != null) {
-                equipment = equipmentMapper.selectById(scheduleVO.getEquipmentId());
-            } else if (scheduleVO.getMachineNo() != null) {
-                equipment = equipmentMapper.selectOne(
-                    new LambdaQueryWrapper<Equipment>()
-                        .eq(Equipment::getMachineNo, scheduleVO.getMachineNo())
-                );
-            }
-            
-            // 查询订单产品信息
-            List<ProductionOrderProduct> products = new ArrayList<>();
-            if (scheduleVO.getMachineNo() != null) {
-                // 查询该机台号的所有订单
-                List<ProductionOrder> orders = orderMapper.selectList(
-                    new LambdaQueryWrapper<ProductionOrder>()
-                        .eq(ProductionOrder::getMachineNo, scheduleVO.getMachineNo())
-                        .in(ProductionOrder::getStatus, 0, 1)
-                );
-                
-                for (ProductionOrder order : orders) {
-                    List<ProductionOrderProduct> orderProducts = orderProductMapper.selectList(
-                        new LambdaQueryWrapper<ProductionOrderProduct>()
-                            .eq(ProductionOrderProduct::getOrderId, order.getId())
-                            .orderByAsc(ProductionOrderProduct::getSortOrder)
-                    );
-                    products.addAll(orderProducts);
-                }
-            }
-            
-            // 查询排程详情（最多30天，排除星期天）
-            List<ProductionSchedule> allSchedules = scheduleMapper.selectList(
-                new LambdaQueryWrapper<ProductionSchedule>()
-                    .eq(ProductionSchedule::getMachineNo, scheduleVO.getMachineNo())
-                    .eq(ProductionSchedule::getIsSunday, 0)
-                    .orderByAsc(ProductionSchedule::getScheduleDate)
-                    .last("LIMIT 30")
+            Equipment equipment = equipmentMapper.selectOne(
+                new LambdaQueryWrapper<Equipment>()
+                    .eq(Equipment::getMachineNo, machineNo)
             );
             
-            // 为每个产品创建一行导出数据
-            if (products.isEmpty() && !allSchedules.isEmpty()) {
-                // 如果没有产品信息，但从排程中获取产品名称（去重）
-                java.util.Set<String> productNames = allSchedules.stream()
-                    .map(ProductionSchedule::getProductName)
-                    .filter(name -> name != null && !name.equals("-"))
-                    .collect(java.util.stream.Collectors.toSet());
-                
-                for (String productName : productNames) {
-                    List<ProductionSchedule> productSchedules = allSchedules.stream()
-                        .filter(s -> productName.equals(s.getProductName()))
-                        .collect(Collectors.toList());
-                    
-                    ProductionScheduleExportVO exportVO = createExportVO(
-                        equipment, productName, null, null, productSchedules
-                    );
-                    exportList.add(exportVO);
-                }
-            } else if (!products.isEmpty()) {
-                // 为每个产品创建一行
-                for (ProductionOrderProduct product : products) {
-                    // 过滤出该产品的排程
-                    List<ProductionSchedule> productSchedules = allSchedules.stream()
-                        .filter(s -> product.getProductName().equals(s.getProductName()))
-                        .collect(Collectors.toList());
-                    
-                    ProductionScheduleExportVO exportVO = createExportVO(
-                        equipment,
-                        product.getProductName(),
-                        product.getOrderQuantity(),
-                        product.getDailyCapacity(),
-                        productSchedules
-                    );
-                    exportList.add(exportVO);
-                }
-            } else {
-                // 如果既没有产品也没有排程，至少创建一行设备信息
-                ProductionScheduleExportVO exportVO = createExportVO(
-                    equipment, "-", null, null, new ArrayList<>()
-                );
-                exportList.add(exportVO);
-            }
+            // 按日期排序
+            machineSchedules.sort((a, b) -> a.getScheduleDate().compareTo(b.getScheduleDate()));
+            
+            // 为每个机台号创建一行导出数据（合并所有产品的排程信息）
+            ProductionScheduleExportVO exportVO = createExportVOByMachine(
+                equipment, machineSchedules, startDate
+            );
+            exportList.add(exportVO);
         }
         
         return exportList;
     }
     
-    private ProductionScheduleExportVO createExportVO(
+    /**
+     * 按机台号创建导出VO（一个机台号一行，合并所有产品的排程信息）
+     */
+    private ProductionScheduleExportVO createExportVOByMachine(
             Equipment equipment,
-            String productName,
-            Integer orderQuantity,
-            Integer dailyCapacity,
-            List<ProductionSchedule> schedules) {
+            List<ProductionSchedule> allSchedules,
+            LocalDate startDate) {
         ProductionScheduleExportVO exportVO = new ProductionScheduleExportVO();
         
         // 填充设备信息
@@ -459,24 +416,45 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
             exportVO.setSpareMold3("-");
         }
         
-        // 填充产品信息
-        exportVO.setProductName(productName != null ? productName : "-");
-        exportVO.setOrderQuantity(orderQuantity != null ? String.valueOf(orderQuantity) : "-");
-        exportVO.setDailyCapacity(dailyCapacity != null ? String.valueOf(dailyCapacity) : "-");
+        // 产品信息：合并所有产品的信息（用逗号分隔）
+        if (!allSchedules.isEmpty()) {
+            java.util.Set<String> productNames = allSchedules.stream()
+                .map(ProductionSchedule::getProductName)
+                .filter(name -> name != null && !name.equals("-"))
+                .collect(java.util.stream.Collectors.toSet());
+            exportVO.setProductName(String.join(", ", productNames));
+        } else {
+            exportVO.setProductName("-");
+        }
+        exportVO.setOrderQuantity("-"); // 机台号级别不显示单个产品的订单数量
+        exportVO.setDailyCapacity("-"); // 机台号级别不显示单个产品的产能
         
-        // 填充每天的排程情况
-        java.util.Map<Integer, ProductionSchedule> scheduleMap = schedules.stream()
+        // 按日期映射排程数据（使用scheduleDate作为key）
+        java.util.Map<LocalDate, ProductionSchedule> scheduleMap = allSchedules.stream()
             .collect(Collectors.toMap(
-                ProductionSchedule::getDayNumber,
+                ProductionSchedule::getScheduleDate,
                 s -> s,
-                (existing, replacement) -> existing
+                (existing, replacement) -> existing // 如果有重复日期，保留第一个
             ));
         
-        // 设置30天的排程数据（排除星期天后的天数）
-        for (int day = 1; day <= 30; day++) {
-            ProductionSchedule schedule = scheduleMap.get(day);
+        // 生成30天的日期列表（从开始日期起，排除星期天）
+        java.util.List<LocalDate> dateList = new ArrayList<>();
+        LocalDate currentDate = startDate;
+        int dayCount = 0;
+        while (dayCount < 30 && dateList.size() < 30) {
+            if (currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                dateList.add(currentDate);
+                dayCount++;
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        // 设置每天的排程数据（使用实际日期匹配）
+        for (int i = 0; i < Math.min(30, dateList.size()); i++) {
+            LocalDate scheduleDate = dateList.get(i);
+            ProductionSchedule schedule = scheduleMap.get(scheduleDate);
             String dayValue = "-";
-            if (schedule != null && !schedule.getProductName().equals("-")) {
+            if (schedule != null && schedule.getProductName() != null && !schedule.getProductName().equals("-")) {
                 // 格式：产品名称 / 排产数量 / 剩余数量
                 dayValue = String.format("%s / %d / %d",
                     schedule.getProductName(),
@@ -484,7 +462,8 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
                     schedule.getRemainingQuantity());
             }
             
-            switch (day) {
+            // 根据索引设置对应的日期列
+            switch (i + 1) {
                 case 1: exportVO.setDay1(dayValue); break;
                 case 2: exportVO.setDay2(dayValue); break;
                 case 3: exportVO.setDay3(dayValue); break;

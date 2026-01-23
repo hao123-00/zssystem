@@ -1,5 +1,7 @@
 package com.zssystem.vo.excel;
 
+import java.sql.Date;
+
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.annotation.write.style.ColumnWidth;
 import lombok.Data;
@@ -74,123 +76,124 @@ public class ProductionScheduleExportVO {
     private String dailyCapacity;
     
     // 每天的排程情况（动态列，最多30天，排除星期天）
-    @ExcelProperty(value = "第1天", index = 15)
+    // 注意：列标题将在导出时动态设置为具体日期
+    @ExcelProperty(value = "日期1", index = 15)
     @ColumnWidth(18)
     private String day1;
     
-    @ExcelProperty(value = "第2天", index = 16)
+    @ExcelProperty(value = "日期2", index = 16)
     @ColumnWidth(18)
     private String day2;
     
-    @ExcelProperty(value = "第3天", index = 17)
+    @ExcelProperty(value = "日期3", index = 17)
     @ColumnWidth(18)
     private String day3;
     
-    @ExcelProperty(value = "第4天", index = 18)
+    @ExcelProperty(value = "日期4", index = 18)
     @ColumnWidth(18)
     private String day4;
     
-    @ExcelProperty(value = "第5天", index = 19)
+    @ExcelProperty(value = "日期5", index = 19)
     @ColumnWidth(18)
     private String day5;
     
-    @ExcelProperty(value = "第6天", index = 20)
+    @ExcelProperty(value = "日期6", index = 20)
     @ColumnWidth(18)
     private String day6;
     
-    @ExcelProperty(value = "第7天", index = 21)
+    @ExcelProperty(value = "日期7", index = 21)
     @ColumnWidth(18)
     private String day7;
     
-    @ExcelProperty(value = "第8天", index = 22)
+    @ExcelProperty(value = "日期8", index = 22)
     @ColumnWidth(18)
     private String day8;
     
-    @ExcelProperty(value = "第9天", index = 23)
+    @ExcelProperty(value = "日期9", index = 23)
     @ColumnWidth(18)
     private String day9;
     
-    @ExcelProperty(value = "第10天", index = 24)
+    @ExcelProperty(value = "日期10", index = 24)
     @ColumnWidth(18)
     private String day10;
     
-    @ExcelProperty(value = "第11天", index = 25)
+    @ExcelProperty(value = "日期11", index = 25)
     @ColumnWidth(18)
     private String day11;
     
-    @ExcelProperty(value = "第12天", index = 26)
+    @ExcelProperty(value = "日期12", index = 26)
     @ColumnWidth(18)
     private String day12;
     
-    @ExcelProperty(value = "第13天", index = 27)
+    @ExcelProperty(value = "日期13", index = 27)
     @ColumnWidth(18)
     private String day13;
     
-    @ExcelProperty(value = "第14天", index = 28)
+    @ExcelProperty(value = "日期14", index = 28)
     @ColumnWidth(18)
     private String day14;
     
-    @ExcelProperty(value = "第15天", index = 29)
+    @ExcelProperty(value = "日期15", index = 29)
     @ColumnWidth(18)
     private String day15;
     
-    @ExcelProperty(value = "第16天", index = 30)
+    @ExcelProperty(value = "日期16", index = 30)
     @ColumnWidth(18)
     private String day16;
     
-    @ExcelProperty(value = "第17天", index = 31)
+    @ExcelProperty(value = "日期17", index = 31)
     @ColumnWidth(18)
     private String day17;
     
-    @ExcelProperty(value = "第18天", index = 32)
+    @ExcelProperty(value = "日期18", index = 32)
     @ColumnWidth(18)
     private String day18;
     
-    @ExcelProperty(value = "第19天", index = 33)
+    @ExcelProperty(value = "日期19", index = 33)
     @ColumnWidth(18)
     private String day19;
     
-    @ExcelProperty(value = "第20天", index = 34)
+    @ExcelProperty(value = "日期20", index = 34)
     @ColumnWidth(18)
     private String day20;
     
-    @ExcelProperty(value = "第21天", index = 35)
+    @ExcelProperty(value = "日期21", index = 35)
     @ColumnWidth(18)
     private String day21;
     
-    @ExcelProperty(value = "第22天", index = 36)
+    @ExcelProperty(value = "日期22", index = 36)
     @ColumnWidth(18)
     private String day22;
     
-    @ExcelProperty(value = "第23天", index = 37)
+    @ExcelProperty(value = "日期23", index = 37)
     @ColumnWidth(18)
     private String day23;
     
-    @ExcelProperty(value = "第24天", index = 38)
+    @ExcelProperty(value = "日期24", index = 38)
     @ColumnWidth(18)
     private String day24;
     
-    @ExcelProperty(value = "第25天", index = 39)
+    @ExcelProperty(value = "日期25", index = 39)
     @ColumnWidth(18)
     private String day25;
     
-    @ExcelProperty(value = "第26天", index = 40)
+    @ExcelProperty(value = "日期26", index = 40)
     @ColumnWidth(18)
     private String day26;
     
-    @ExcelProperty(value = "第27天", index = 41)
+    @ExcelProperty(value = "日期27", index = 41)
     @ColumnWidth(18)
     private String day27;
     
-    @ExcelProperty(value = "第28天", index = 42)
+    @ExcelProperty(value = "日期28", index = 42)
     @ColumnWidth(18)
     private String day28;
     
-    @ExcelProperty(value = "第29天", index = 43)
+    @ExcelProperty(value = "日期29", index = 43)
     @ColumnWidth(18)
     private String day29;
     
-    @ExcelProperty(value = "第30天", index = 44)
+    @ExcelProperty(value = "日期30", index = 44)
     @ColumnWidth(18)
     private String day30;
 }

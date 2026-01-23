@@ -25,10 +25,7 @@ public class ProductionScheduleController {
     @PostMapping("/generate")
     public Result<ProductionScheduleVO> generateSchedule(
             @RequestParam String machineNo,
-            @RequestParam(required = false) LocalDate startDate) {
-        if (startDate == null) {
-            startDate = LocalDate.now();
-        }
+            @RequestParam LocalDate startDate) {
         ProductionScheduleVO vo = scheduleService.generateSchedule(machineNo, startDate);
         return Result.success(vo);
     }
@@ -43,18 +40,19 @@ public class ProductionScheduleController {
     public Result<ProductionScheduleVO> getScheduleByMachineNo(
             @PathVariable String machineNo,
             @RequestParam(required = false) LocalDate startDate) {
-        if (startDate == null) {
-            startDate = LocalDate.now();
-        }
         ProductionScheduleVO vo = scheduleService.getScheduleByMachineNo(machineNo, startDate);
         return Result.success(vo);
     }
 
     @GetMapping("/export")
     public void exportSchedule(@Validated ProductionScheduleQueryDTO queryDTO) {
+        if (queryDTO.getStartDate() == null) {
+            throw new RuntimeException("排程开始日期不能为空");
+        }
         List<ProductionScheduleExportVO> exportData = scheduleService.getExportData(queryDTO);
         String fileName = ExcelUtil.generateFileName("生产管理_生产计划排程");
-        ExcelUtil.exportExcel(exportData, fileName, "生产计划排程", ProductionScheduleExportVO.class);
+        ExcelUtil.exportExcel(exportData, fileName, "生产计划排程", ProductionScheduleExportVO.class,
+                new com.zssystem.util.ScheduleExcelWriteHandler(queryDTO.getStartDate()));
     }
 
     @DeleteMapping("/machine/{machineNo}")

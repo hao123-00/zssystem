@@ -48,7 +48,7 @@ const PlanList: React.FC = () => {
       const values = form.getFieldsValue();
       const params: ProductionScheduleQueryParams = {
         machineNo: values.machineNo,
-        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : undefined,
       };
       // 获取按机台号分组的排程列表
       const response = await getScheduleList(params);
@@ -84,7 +84,12 @@ const PlanList: React.FC = () => {
         return;
       }
       
-      const startDate = values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
+      if (!values.startDate) {
+        message.warning('请先选择排程开始日期');
+        return;
+      }
+      
+      const startDate = values.startDate.format('YYYY-MM-DD');
       
       setLoading(true);
       await generateSchedule(targetMachineNo, startDate);
@@ -103,28 +108,29 @@ const PlanList: React.FC = () => {
 
   const handleReset = () => {
     form.resetFields();
-    form.setFieldsValue({
-      startDate: dayjs(),
-    });
     fetchList();
   };
 
   const handleExport = async () => {
     try {
       const values = form.getFieldsValue();
-      if (!values.machineNo) {
-        message.warning('请先选择机台号');
+      
+      if (!values.startDate) {
+        message.warning('请先选择排程开始日期');
         return;
       }
       
+      // 根据排程开始日期导出所有符合该日期的机台号排程
       const params: ProductionScheduleQueryParams = {
-        machineNo: values.machineNo,
-        startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+        // 不传机台号，导出所有机台号
+        machineNo: undefined,
+        startDate: values.startDate.format('YYYY-MM-DD'),
       };
       
       const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
       const filename = `生产管理_生产计划排程_${date}`;
       await exportExcel('/api/production/schedule/export', params, filename);
+      message.success('导出成功');
     } catch (error: any) {
       message.error('导出失败：' + (error.message || '未知错误'));
     }
@@ -204,7 +210,7 @@ const PlanList: React.FC = () => {
   return (
     <div className="production-list-container">
       <div className="search-form">
-        <Form form={form} layout="inline" initialValues={{ startDate: dayjs() }}>
+        <Form form={form} layout="inline">
           <Form.Item name="machineNo" label="机台号">
             <Select
               placeholder="请选择机台号"
@@ -222,7 +228,7 @@ const PlanList: React.FC = () => {
               }}
             />
           </Form.Item>
-          <Form.Item name="startDate" label="排程开始日期">
+          <Form.Item name="startDate" label="排程开始日期" rules={[{ required: true, message: '请选择排程开始日期' }]}>
             <DatePicker format="YYYY-MM-DD" />
           </Form.Item>
           <Form.Item>
@@ -250,7 +256,6 @@ const PlanList: React.FC = () => {
             type="primary"
             icon={<DownloadOutlined />}
             onClick={handleExport}
-            disabled={scheduleList.length === 0}
           >
             导出Excel
           </Button>
