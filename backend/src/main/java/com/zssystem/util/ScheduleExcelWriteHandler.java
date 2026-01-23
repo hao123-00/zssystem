@@ -47,6 +47,26 @@ public class ScheduleExcelWriteHandler implements RowWriteHandler, SheetWriteHan
         Row headerRow = sheet.getRow(0);
         if (headerRow != null) {
             updateDateHeaders(headerRow);
+            // 隐藏超出本月范围的列
+            hideExtraColumns(sheet);
+        }
+    }
+    
+    /**
+     * 隐藏超出本月范围的日期列
+     */
+    private void hideExtraColumns(Sheet sheet) {
+        if (dateList == null || dateList.isEmpty()) {
+            return;
+        }
+        
+        int startColumnIndex = 15; // 日期列从第15列开始（索引15，对应day1）
+        int maxColumns = 30; // ProductionScheduleExportVO最多有30个日期列
+        
+        // 隐藏超出本月范围的列（从dateList.size()开始到maxColumns）
+        for (int i = dateList.size(); i < maxColumns; i++) {
+            int columnIndex = startColumnIndex + i;
+            sheet.setColumnHidden(columnIndex, true);
         }
     }
     
@@ -60,16 +80,26 @@ public class ScheduleExcelWriteHandler implements RowWriteHandler, SheetWriteHan
         
         // 从第15列开始（索引15，对应day1）设置日期标题
         int startColumnIndex = 15;
-        for (int i = 0; i < Math.min(30, dateList.size()); i++) {
+        int maxColumns = 30; // ProductionScheduleExportVO最多有30个日期列
+        
+        // 设置实际日期列的标题
+        for (int i = 0; i < dateList.size() && i < maxColumns; i++) {
             int columnIndex = startColumnIndex + i;
             Cell cell = headerRow.getCell(columnIndex);
             if (cell == null) {
-                // 如果单元格不存在，创建它
                 cell = headerRow.createCell(columnIndex);
             }
-            if (i < dateList.size()) {
-                // 使用从前端传递的日期值（格式：yyyy-MM-dd，如：2026-01-02）
-                cell.setCellValue(dateList.get(i));
+            // 使用从前端传递的日期值（格式：yyyy-MM-dd，如：2026-01-02）
+            cell.setCellValue(dateList.get(i));
+        }
+        
+        // 对于超出本月范围的列，隐藏或设置为空（避免显示"日期28"、"日期29"等）
+        for (int i = dateList.size(); i < maxColumns; i++) {
+            int columnIndex = startColumnIndex + i;
+            Cell cell = headerRow.getCell(columnIndex);
+            if (cell != null) {
+                // 将超出范围的列标题设置为空字符串，或者可以隐藏列
+                cell.setCellValue("");
             }
         }
     }

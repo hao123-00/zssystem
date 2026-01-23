@@ -92,10 +92,25 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
         LocalDate currentDate = startDate;
         boolean allProductsCompleted = false; // 标记所有产品是否完成
         
-        // 持续生成排程，直到所有产品完成或达到最大天数限制
-        // 一个月约30天，去掉星期日后约26天，设置为30天以确保覆盖一个月
-        int maxDays = 30; // 最大排程天数限制（一个月，去掉星期日）
-        while (dayNumber < maxDays && currentProductIndex < allProducts.size()) {
+        // 持续生成排程，直到所有产品完成或达到本月最后一天
+        // 计算本月最后一天（排程开始日期所在月份的最后一天）
+        LocalDate monthEndDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        
+        // 计算本月内的工作日数量（排除星期天），用于判断是否所有工作日都已排程完毕
+        int monthWorkDaysCount = 0;
+        LocalDate workDayCheckDate = startDate;
+        while (!workDayCheckDate.isAfter(monthEndDate)) {
+            if (workDayCheckDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
+                monthWorkDaysCount++;
+            }
+            workDayCheckDate = workDayCheckDate.plusDays(1);
+        }
+        
+        while (currentDate.isBefore(monthEndDate.plusDays(1)) && currentProductIndex < allProducts.size()) {
+            // 如果已经排程完本月内所有工作日，提前停止
+            if (dayNumber >= monthWorkDaysCount) {
+                break;
+            }
             // 先计算当前产品的剩余数量
             remainingQuantity = currentProduct.getOrderQuantity() - 
                                (currentProduct.getDailyCapacity() * currentProductDays);
@@ -160,12 +175,13 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
             currentDate = currentDate.plusDays(1);
         }
         
-        // 6. 判断是否能在指定时间内完成所有产品的生产目标
+        // 6. 判断是否能在本月内完成所有产品的生产目标
         boolean canComplete = false;
         if (allProductsCompleted) {
             // 所有产品都已完成，计划完成
             canComplete = true;
         } else {
+            // 复用之前计算的monthWorkDaysCount
             // 计算所有产品的总需求天数（排除星期天）
             int totalRequiredDays = 0;
             for (ProductionOrderProduct product : allProducts) {
@@ -175,8 +191,8 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
                     totalRequiredDays += daysNeeded;
                 }
             }
-            // 判断在最大天数内是否能完成
-            canComplete = totalRequiredDays <= maxDays;
+            // 判断在本月工作日内是否能完成
+            canComplete = totalRequiredDays <= monthWorkDaysCount;
         }
         
         // 6. 构建返回VO
@@ -477,14 +493,15 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
                 (existing, replacement) -> existing // 如果有重复日期，保留第一个
             ));
         
-        // 生成30天的日期列表（从开始日期起，排除星期天）
+        // 生成本月内的日期列表（从开始日期起，到本月最后一天，排除星期天）
         java.util.List<LocalDate> dateList = new ArrayList<>();
         LocalDate currentDate = startDate;
-        int dayCount = 0;
-        while (dayCount < 30 && dateList.size() < 30) {
+        // 计算本月最后一天（排程开始日期所在月份的最后一天）
+        LocalDate monthEndDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        
+        while (!currentDate.isAfter(monthEndDate)) {
             if (currentDate.getDayOfWeek() != DayOfWeek.SUNDAY) {
                 dateList.add(currentDate);
-                dayCount++;
             }
             currentDate = currentDate.plusDays(1);
         }

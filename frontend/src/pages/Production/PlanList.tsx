@@ -120,15 +120,16 @@ const PlanList: React.FC = () => {
         return;
       }
       
-      // 根据排程开始日期生成30天的日期列表（排除星期天），用于Excel列标题
+      // 根据排程开始日期生成本月内的日期列表（排除星期天），用于Excel列标题
       const dateList: string[] = [];
       let currentDate = values.startDate.clone();
-      let dayCount = 0;
-      while (dayCount < 30 && dateList.length < 30) {
+      // 计算本月最后一天（排程开始日期所在月份的最后一天）
+      const monthEndDate = currentDate.endOf('month');
+      
+      while (currentDate.isBefore(monthEndDate) || currentDate.isSame(monthEndDate, 'day')) {
         // dayjs中day()返回0-6，0是星期天
         if (currentDate.day() !== 0) {
           dateList.push(currentDate.format('YYYY-MM-DD'));
-          dayCount++;
         }
         currentDate = currentDate.add(1, 'day');
       }

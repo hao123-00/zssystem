@@ -41,11 +41,20 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
   const loadEquipmentDetail = async (id: number) => {
     try {
       const detail = await getEquipmentById(id);
+      const enableDateValue = detail.enableDate ? dayjs(detail.enableDate) : null;
       form.setFieldsValue({
         ...detail,
         purchaseDate: detail.purchaseDate ? dayjs(detail.purchaseDate) : null,
-        enableDate: detail.enableDate ? dayjs(detail.enableDate) : null,
+        enableDate: enableDateValue,
       });
+      
+      // 如果启用日期存在，自动计算使用年限
+      if (enableDateValue) {
+        const currentYear = new Date().getFullYear();
+        const enableYear = enableDateValue.year();
+        const serviceLife = currentYear - enableYear;
+        form.setFieldsValue({ serviceLife: serviceLife >= 0 ? serviceLife : 0 });
+      }
     } catch (error: any) {
       message.error('加载设备详情失败');
     }
@@ -134,16 +143,41 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
           <Input placeholder="请输入机械手型号" />
         </Form.Item>
         <Form.Item name="enableDate" label="启用日期">
-          <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <DatePicker
+            format="YYYY-MM-DD"
+            style={{ width: '100%' }}
+            onChange={(date) => {
+              if (date) {
+                // 计算使用年限：今年 - 启用年
+                const currentYear = new Date().getFullYear();
+                const enableYear = date.year();
+                const serviceLife = currentYear - enableYear;
+                form.setFieldsValue({ serviceLife: serviceLife >= 0 ? serviceLife : 0 });
+              } else {
+                form.setFieldsValue({ serviceLife: undefined });
+              }
+            }}
+          />
         </Form.Item>
         <Form.Item name="serviceLife" label="使用年限（年）">
-          <InputNumber min={0} placeholder="请输入使用年限" style={{ width: '100%' }} />
+          <InputNumber
+            min={0}
+            placeholder="自动计算（根据启用日期）"
+            style={{ width: '100%' }}
+            readOnly
+          />
         </Form.Item>
         <Form.Item name="moldTempMachine" label="模温机">
-          <Input placeholder="请输入模温机" />
+          <Select placeholder="请选择模温机">
+            <Select.Option value="是">是</Select.Option>
+            <Select.Option value="否">否</Select.Option>
+          </Select>
         </Form.Item>
         <Form.Item name="chiller" label="冻水机">
-          <Input placeholder="请输入冻水机" />
+          <Select placeholder="请选择冻水机">
+            <Select.Option value="是">是</Select.Option>
+            <Select.Option value="否">否</Select.Option>
+          </Select>
         </Form.Item>
         <Form.Item name="basicMold" label="基本排模">
           <Input placeholder="请输入基本排模" />
