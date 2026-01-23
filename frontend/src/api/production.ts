@@ -64,6 +64,7 @@ export interface ScheduleDayInfo {
 export interface ProductionScheduleQueryParams {
   machineNo?: string; // 机台号
   startDate?: string; // 排程开始日期
+  dateList?: string[]; // 日期列表（用于Excel列标题）
 }
 
 // ========== 生产记录 ==========

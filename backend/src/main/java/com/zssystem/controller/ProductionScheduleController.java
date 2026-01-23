@@ -51,8 +51,9 @@ public class ProductionScheduleController {
         }
         List<ProductionScheduleExportVO> exportData = scheduleService.getExportData(queryDTO);
         String fileName = ExcelUtil.generateFileName("生产管理_生产计划排程");
+        // 使用从前端传递的日期列表设置Excel列标题
         ExcelUtil.exportExcel(exportData, fileName, "生产计划排程", ProductionScheduleExportVO.class,
-                new com.zssystem.util.ScheduleExcelWriteHandler(queryDTO.getStartDate()));
+                new com.zssystem.util.ScheduleExcelWriteHandler(queryDTO.getDateList()));
     }
 
     @DeleteMapping("/machine/{machineNo}")

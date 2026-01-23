@@ -120,11 +120,25 @@ const PlanList: React.FC = () => {
         return;
       }
       
+      // 根据排程开始日期生成30天的日期列表（排除星期天），用于Excel列标题
+      const dateList: string[] = [];
+      let currentDate = values.startDate.clone();
+      let dayCount = 0;
+      while (dayCount < 30 && dateList.length < 30) {
+        // dayjs中day()返回0-6，0是星期天
+        if (currentDate.day() !== 0) {
+          dateList.push(currentDate.format('YYYY-MM-DD'));
+          dayCount++;
+        }
+        currentDate = currentDate.add(1, 'day');
+      }
+      
       // 根据排程开始日期导出所有符合该日期的机台号排程
       const params: ProductionScheduleQueryParams = {
         // 不传机台号，导出所有机台号
         machineNo: undefined,
         startDate: values.startDate.format('YYYY-MM-DD'),
+        dateList: dateList, // 传递日期列表用于Excel列标题
       };
       
       const date = new Date().toISOString().split('T')[0].replace(/-/g, '');

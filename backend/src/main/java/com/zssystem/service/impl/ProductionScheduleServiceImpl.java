@@ -423,11 +423,51 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
                 .filter(name -> name != null && !name.equals("-"))
                 .collect(java.util.stream.Collectors.toSet());
             exportVO.setProductName(String.join(", ", productNames));
+            
+            // 获取所有排程记录关联的订单ID
+            java.util.Set<Long> orderIds = allSchedules.stream()
+                .map(ProductionSchedule::getOrderId)
+                .filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toSet());
+            
+            // 查询订单产品信息，获取订单数量和产能
+            List<String> orderQuantityList = new ArrayList<>();
+            List<String> dailyCapacityList = new ArrayList<>();
+            
+            for (Long orderId : orderIds) {
+                List<ProductionOrderProduct> products = orderProductMapper.selectList(
+                    new LambdaQueryWrapper<ProductionOrderProduct>()
+                        .eq(ProductionOrderProduct::getOrderId, orderId)
+                        .orderByAsc(ProductionOrderProduct::getSortOrder)
+                );
+                
+                for (ProductionOrderProduct product : products) {
+                    if (product.getOrderQuantity() != null) {
+                        orderQuantityList.add(product.getOrderQuantity().toString());
+                    }
+                    if (product.getDailyCapacity() != null) {
+                        dailyCapacityList.add(product.getDailyCapacity().toString());
+                    }
+                }
+            }
+            
+            // 设置订单数量和产能（用逗号分隔多个产品的值）
+            if (!orderQuantityList.isEmpty()) {
+                exportVO.setOrderQuantity(String.join(", ", orderQuantityList));
+            } else {
+                exportVO.setOrderQuantity("-");
+            }
+            
+            if (!dailyCapacityList.isEmpty()) {
+                exportVO.setDailyCapacity(String.join(", ", dailyCapacityList));
+            } else {
+                exportVO.setDailyCapacity("-");
+            }
         } else {
             exportVO.setProductName("-");
+            exportVO.setOrderQuantity("-");
+            exportVO.setDailyCapacity("-");
         }
-        exportVO.setOrderQuantity("-"); // 机台号级别不显示单个产品的订单数量
-        exportVO.setDailyCapacity("-"); // 机台号级别不显示单个产品的产能
         
         // 按日期映射排程数据（使用scheduleDate作为key）
         java.util.Map<LocalDate, ProductionSchedule> scheduleMap = allSchedules.stream()

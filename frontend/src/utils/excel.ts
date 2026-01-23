@@ -11,8 +11,19 @@ import { getToken } from './auth';
 export const exportExcel = async (url: string, params: any, filename: string) => {
   try {
     const token = getToken();
+    
+    // 处理数组参数：将数组转换为Spring Boot可以识别的格式
+    const processedParams: any = { ...params };
+    if (params.dateList && Array.isArray(params.dateList)) {
+      // Spring Boot GET请求中，数组参数格式为：dateList=value1&dateList=value2
+      processedParams.dateList = params.dateList;
+    }
+    
     const response = await axios.get(url, {
-      params,
+      params: processedParams,
+      paramsSerializer: {
+        indexes: null, // 使用重复的键名格式：dateList=value1&dateList=value2
+      },
       responseType: 'blob',
       headers: {
         Authorization: token ? `Bearer ${token}` : undefined,
