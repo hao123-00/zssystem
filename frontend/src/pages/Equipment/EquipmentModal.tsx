@@ -38,22 +38,44 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
     }
   }, [visible, equipment]);
 
+  /**
+   * 计算使用年限（格式：X年X个月）
+   */
+  const calculateServiceLife = (purchaseDate: dayjs.Dayjs | null): string | undefined => {
+    if (!purchaseDate) {
+      return undefined;
+    }
+    
+    const now = dayjs();
+    const years = now.diff(purchaseDate, 'year');
+    const months = now.diff(purchaseDate.add(years, 'year'), 'month');
+    
+    if (years === 0 && months === 0) {
+      return '0个月';
+    } else if (years === 0) {
+      return `${months}个月`;
+    } else if (months === 0) {
+      return `${years}年`;
+    } else {
+      return `${years}年${months}个月`;
+    }
+  };
+
   const loadEquipmentDetail = async (id: number) => {
     try {
       const detail = await getEquipmentById(id);
+      const purchaseDateValue = detail.purchaseDate ? dayjs(detail.purchaseDate) : null;
       const enableDateValue = detail.enableDate ? dayjs(detail.enableDate) : null;
       form.setFieldsValue({
         ...detail,
-        purchaseDate: detail.purchaseDate ? dayjs(detail.purchaseDate) : null,
+        purchaseDate: purchaseDateValue,
         enableDate: enableDateValue,
       });
       
-      // 如果启用日期存在，自动计算使用年限
-      if (enableDateValue) {
-        const currentYear = new Date().getFullYear();
-        const enableYear = enableDateValue.year();
-        const serviceLife = currentYear - enableYear;
-        form.setFieldsValue({ serviceLife: serviceLife >= 0 ? serviceLife : 0 });
+      // 如果购买日期存在，自动计算使用年限
+      if (purchaseDateValue) {
+        const serviceLife = calculateServiceLife(purchaseDateValue);
+        form.setFieldsValue({ serviceLife });
       }
     } catch (error: any) {
       message.error('加载设备详情失败');
@@ -137,46 +159,43 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
           <Input placeholder="请输入制造商" />
         </Form.Item>
         <Form.Item name="purchaseDate" label="购买日期">
-          <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item name="robotModel" label="机械手型号">
-          <Input placeholder="请输入机械手型号" />
-        </Form.Item>
-        <Form.Item name="enableDate" label="启用日期">
           <DatePicker
             format="YYYY-MM-DD"
             style={{ width: '100%' }}
             onChange={(date) => {
               if (date) {
-                // 计算使用年限：今年 - 启用年
-                const currentYear = new Date().getFullYear();
-                const enableYear = date.year();
-                const serviceLife = currentYear - enableYear;
-                form.setFieldsValue({ serviceLife: serviceLife >= 0 ? serviceLife : 0 });
+                // 根据购买日期自动计算使用年限（格式：X年X个月）
+                const serviceLife = calculateServiceLife(date);
+                form.setFieldsValue({ serviceLife });
               } else {
                 form.setFieldsValue({ serviceLife: undefined });
               }
             }}
           />
         </Form.Item>
-        <Form.Item name="serviceLife" label="使用年限（年）">
-          <InputNumber
-            min={0}
-            placeholder="自动计算（根据启用日期）"
+        <Form.Item name="robotModel" label="机械手型号">
+          <Input placeholder="请输入机械手型号" />
+        </Form.Item>
+        <Form.Item name="enableDate" label="启用日期">
+          <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item name="serviceLife" label="使用年限">
+          <Input
+            placeholder="自动计算（根据购买日期）"
             style={{ width: '100%' }}
             readOnly
           />
         </Form.Item>
         <Form.Item name="moldTempMachine" label="模温机">
           <Select placeholder="请选择模温机">
-            <Select.Option value="是">是</Select.Option>
-            <Select.Option value="否">否</Select.Option>
+            <Select.Option value="有">有</Select.Option>
+            <Select.Option value="无">无</Select.Option>
           </Select>
         </Form.Item>
         <Form.Item name="chiller" label="冻水机">
           <Select placeholder="请选择冻水机">
-            <Select.Option value="是">是</Select.Option>
-            <Select.Option value="否">否</Select.Option>
+            <Select.Option value="有">有</Select.Option>
+            <Select.Option value="无">无</Select.Option>
           </Select>
         </Form.Item>
         <Form.Item name="basicMold" label="基本排模">

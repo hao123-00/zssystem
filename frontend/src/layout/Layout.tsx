@@ -10,6 +10,7 @@ import {
   ApartmentOutlined,
   ShopOutlined,
   ToolOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import { logout } from '@/utils/auth';
 import './Layout.less';
@@ -55,11 +56,30 @@ const Layout: React.FC = () => {
       key: '/production',
       icon: <ShopOutlined />,
       label: '生产管理',
+      children: [
+        {
+          key: '/production',
+          label: '生产订单',
+        },
+        {
+          key: '/production/process-file',
+          label: '工艺文件管理',
+        },
+        {
+          key: '/production/process-file/pending-approval',
+          label: '待我审批',
+        },
+      ],
     },
     {
       key: '/equipment',
       icon: <ToolOutlined />,
       label: '设备管理',
+    },
+    {
+      key: '/site5s',
+      icon: <SafetyOutlined />,
+      label: '现场5S管理',
     },
   ];
 

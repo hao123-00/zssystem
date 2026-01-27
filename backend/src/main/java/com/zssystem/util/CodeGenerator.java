@@ -29,4 +29,20 @@ public class CodeGenerator {
         String date = LocalDate.now().format(DATE_FORMATTER);
         return String.format("RECORD%s%03d", date, sequence);
     }
+
+    /**
+     * 生成5S检查单号：5SCHECK + 日期 + 序号
+     */
+    public static String generate5sCheckNo(int sequence) {
+        String date = LocalDate.now().format(DATE_FORMATTER);
+        return String.format("5SCHECK%s%03d", date, sequence);
+    }
+
+    /**
+     * 生成5S任务编号：5STASK + 日期 + 序号
+     */
+    public static String generate5sTaskNo(int sequence) {
+        String date = LocalDate.now().format(DATE_FORMATTER);
+        return String.format("5STASK%s%03d", date, sequence);
+    }
 }

@@ -25,7 +25,7 @@ public class ProductionRecordVO {
     private String equipmentModel; // 设备型号
     private String robotModel; // 机械手型号
     private LocalDate enableDate; // 启用日期
-    private Integer serviceLife; // 使用年限
+    private String serviceLife; // 使用年限（格式：X年X个月）
     private String moldTempMachine; // 模温机
     private String chiller; // 冻水机
     private String basicMold; // 基本排模

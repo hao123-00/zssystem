@@ -17,7 +17,7 @@ public class EquipmentVO {
     private LocalDate purchaseDate;
     private String robotModel;
     private LocalDate enableDate;
-    private Integer serviceLife;
+    private String serviceLife;
     private String moldTempMachine;
     private String chiller;
     private String basicMold;

@@ -510,7 +510,8 @@ public class ProductionRecordServiceImpl implements ProductionRecordService {
                 exportVO.setEquipmentModel(equipment.getEquipmentModel() != null ? equipment.getEquipmentModel() : "-");
                 exportVO.setRobotModel(equipment.getRobotModel() != null ? equipment.getRobotModel() : "-");
                 exportVO.setEnableDate(equipment.getEnableDate() != null ? equipment.getEnableDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) : "-");
-                exportVO.setServiceLife(equipment.getServiceLife() != null ? equipment.getServiceLife() + "年" : "-");
+                // 直接使用设备的使用年限字段（已根据购买日期计算，格式：X年X个月）
+                exportVO.setServiceLife(equipment.getServiceLife() != null ? equipment.getServiceLife() : "-");
                 exportVO.setMoldTempMachine(equipment.getMoldTempMachine() != null ? equipment.getMoldTempMachine() : "-");
                 exportVO.setChiller(equipment.getChiller() != null ? equipment.getChiller() : "-");
                 exportVO.setBasicMold(equipment.getBasicMold() != null ? equipment.getBasicMold() : "-");

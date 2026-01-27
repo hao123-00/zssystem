@@ -29,7 +29,7 @@ public class EquipmentSaveDTO {
     
     private LocalDate enableDate;
     
-    private Integer serviceLife;
+    private String serviceLife;
     
     private String moldTempMachine;
     

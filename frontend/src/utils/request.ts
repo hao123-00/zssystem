@@ -23,6 +23,12 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
+    // 如果是blob响应（文件下载），直接返回
+    if (response.data instanceof Blob) {
+      return response;
+    }
+    
+    // 普通JSON响应，解析数据
     const { code, message, data } = response.data;
     if (code === 200) {
       return data;

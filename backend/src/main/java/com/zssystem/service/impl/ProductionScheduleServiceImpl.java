@@ -410,7 +410,8 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
             exportVO.setRobotModel(equipment.getRobotModel() != null ? equipment.getRobotModel() : "-");
             exportVO.setEnableDate(equipment.getEnableDate() != null ? 
                 equipment.getEnableDate().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) : "-");
-            exportVO.setServiceLife(equipment.getServiceLife() != null ? equipment.getServiceLife() + "年" : "-");
+            // 直接使用设备的使用年限字段（已根据购买日期计算，格式：X年X个月）
+            exportVO.setServiceLife(equipment.getServiceLife() != null ? equipment.getServiceLife() : "-");
             exportVO.setMoldTempMachine(equipment.getMoldTempMachine() != null ? equipment.getMoldTempMachine() : "-");
             exportVO.setChiller(equipment.getChiller() != null ? equipment.getChiller() : "-");
             exportVO.setBasicMold(equipment.getBasicMold() != null ? equipment.getBasicMold() : "-");
@@ -507,19 +508,23 @@ public class ProductionScheduleServiceImpl implements ProductionScheduleService 
         }
         
         // 设置每天的排程数据（使用实际日期匹配）
+        // 注意：由于每个日期需要3列（产品名称、排产数量、剩余数量），
+        // 这里先设置占位值，实际数据将通过自定义RowWriteHandler写入
         for (int i = 0; i < Math.min(30, dateList.size()); i++) {
             LocalDate scheduleDate = dateList.get(i);
             ProductionSchedule schedule = scheduleMap.get(scheduleDate);
             String dayValue = "-";
             if (schedule != null && schedule.getProductName() != null && !schedule.getProductName().equals("-")) {
-                // 格式：产品名称 / 排产数量 / 剩余数量
-                dayValue = String.format("%s / %d / %d",
+                // 格式：产品名称|排产数量|剩余数量（用于自定义RowWriteHandler解析）
+                dayValue = String.format("%s|%d|%d",
                     schedule.getProductName(),
-                    schedule.getProductionQuantity(),
-                    schedule.getRemainingQuantity());
+                    schedule.getProductionQuantity() != null ? schedule.getProductionQuantity() : 0,
+                    schedule.getRemainingQuantity() != null ? schedule.getRemainingQuantity() : 0);
+            } else {
+                dayValue = String.format("%s|%d|%d", "-", 0, 0);
             }
             
-            // 根据索引设置对应的日期列
+            // 根据索引设置对应的日期列（占位值，实际数据将通过自定义RowWriteHandler写入）
             switch (i + 1) {
                 case 1: exportVO.setDay1(dayValue); break;
                 case 2: exportVO.setDay2(dayValue); break;

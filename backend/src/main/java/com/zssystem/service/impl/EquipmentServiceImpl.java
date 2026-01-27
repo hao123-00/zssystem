@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -78,6 +80,33 @@ public class EquipmentServiceImpl implements EquipmentService {
         return vo;
     }
 
+    /**
+     * 计算使用年限（格式：X年X个月）
+     * @param purchaseDate 购买日期
+     * @return 使用年限字符串，如"2年3个月"
+     */
+    private String calculateServiceLife(LocalDate purchaseDate) {
+        if (purchaseDate == null) {
+            return null;
+        }
+        
+        LocalDate now = LocalDate.now();
+        Period period = Period.between(purchaseDate, now);
+        
+        int years = period.getYears();
+        int months = period.getMonths();
+        
+        if (years == 0 && months == 0) {
+            return "0个月";
+        } else if (years == 0) {
+            return months + "个月";
+        } else if (months == 0) {
+            return years + "年";
+        } else {
+            return years + "年" + months + "个月";
+        }
+    }
+
     @Override
     @Transactional
     public void createEquipment(EquipmentSaveDTO saveDTO) {
@@ -94,6 +123,12 @@ public class EquipmentServiceImpl implements EquipmentService {
         if (equipment.getStatus() == null) {
             equipment.setStatus(1); // 默认正常
         }
+        
+        // 根据购买日期自动计算使用年限
+        if (equipment.getPurchaseDate() != null) {
+            equipment.setServiceLife(calculateServiceLife(equipment.getPurchaseDate()));
+        }
+        
         equipmentMapper.insert(equipment);
     }
 
@@ -117,6 +152,12 @@ public class EquipmentServiceImpl implements EquipmentService {
         }
 
         BeanUtil.copyProperties(saveDTO, equipment, "id", "createTime", "updateTime", "deleted");
+        
+        // 根据购买日期自动计算使用年限
+        if (equipment.getPurchaseDate() != null) {
+            equipment.setServiceLife(calculateServiceLife(equipment.getPurchaseDate()));
+        }
+        
         equipmentMapper.updateById(equipment);
     }
 

@@ -1,1 +1,16 @@
-/.idea
+/.ideaqi
+
+# 日志文件
+*.log
+/tmp/backend_*.log
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 编译输出
+backend/target/
+frontend/dist/
+frontend/node_modules/
+frontend/.vite/

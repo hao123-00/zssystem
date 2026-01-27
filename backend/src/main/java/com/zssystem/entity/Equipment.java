@@ -40,7 +40,7 @@ public class Equipment {
     private LocalDate enableDate;
     
     @TableField("service_life")
-    private Integer serviceLife;
+    private String serviceLife;
     
     @TableField("mold_temp_machine")
     private String moldTempMachine;
