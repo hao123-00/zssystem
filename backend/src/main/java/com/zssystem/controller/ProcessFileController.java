@@ -289,9 +289,17 @@ public class ProcessFileController {
         } catch (Exception e) {
             System.err.println("下载文件失败: " + e.getMessage());
             e.printStackTrace();
-            // 不设置包含中文的错误头，避免编码问题
+            
+            // 返回JSON格式的错误信息，方便前端解析
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "下载失败";
+            String jsonError = "{\"code\":500,\"message\":\"" + errorMessage.replace("\"", "\\\"") + "\"}";
+            
+            HttpHeaders errorHeaders = new HttpHeaders();
+            errorHeaders.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+            
             return ResponseEntity.status(500)
-                    .body(("下载失败: " + e.getMessage()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    .headers(errorHeaders)
+                    .body(jsonError.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
     }
 

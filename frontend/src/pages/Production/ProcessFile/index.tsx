@@ -148,6 +148,20 @@ const ProcessFileList: React.FC = () => {
       const response = await downloadProcessFile(record.id);
       console.log('下载响应:', response);
       
+      // 检查响应状态
+      if (!response || !response.data) {
+        throw new Error('下载响应为空');
+      }
+      
+      // 检查是否是错误响应（可能是文本错误信息）
+      if (response.data instanceof Blob) {
+        // 检查blob的type，如果是text/plain或application/json，可能是错误信息
+        if (response.data.type === 'text/plain' || response.data.type === 'application/json' || response.data.size < 100) {
+          const text = await response.data.text();
+          throw new Error(text || '下载失败');
+        }
+      }
+      
       // 对于blob响应，response本身就是axios响应对象，response.data是blob
       const blob = response.data instanceof Blob 
         ? response.data 
@@ -155,7 +169,7 @@ const ProcessFileList: React.FC = () => {
       
       // 从响应头获取文件名（如果后端设置了）
       const contentDisposition = response.headers['content-disposition'];
-      let fileName = record.fileName;
+      let fileName = record.fileName || `工艺文件_${record.id}.xlsx`;
       if (contentDisposition) {
         const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
         if (fileNameMatch && fileNameMatch[1]) {
@@ -174,7 +188,8 @@ const ProcessFileList: React.FC = () => {
       message.success('下载成功');
     } catch (error: any) {
       console.error('下载工艺文件失败:', error);
-      message.error('下载失败: ' + (error.message || '未知错误'));
+      const errorMessage = error.message || '未知错误';
+      message.error('下载失败: ' + errorMessage);
     }
   };
 

@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: zssystem-backend
+  # DevTools 热部署配置
+  devtools:
+    restart:
+      enabled: true  # 启用自动重启
+      additional-paths: src/main/java,src/main/resources  # 监听的文件路径
+      exclude: static/**,public/**,templates/**  # 排除不需要重启的路径
+    livereload:
+      enabled: true  # 启用LiveReload（可选）
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/zssystem?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true

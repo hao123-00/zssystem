@@ -836,46 +836,6 @@ const ProcessFileForm: React.FC = () => {
               </Col>
             </Row>
           </Card>
-
-          {/* 工序内容和品质检查 */}
-          <Card title="工序内容和品质检查" size="small" style={{ marginBottom: 16 }}>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="工序内容" name="processContent">
-                  <TextArea
-                    rows={6}
-                    placeholder="请输入工序内容"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item label="品质检查" name="qualityInspection">
-                  <TextArea
-                    rows={6}
-                    placeholder="请输入品质检查"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={24}>
-                <Form.Item label="模具及注塑工艺综合评估" name="comprehensiveAssessment">
-                  <TextArea
-                    rows={3}
-                    placeholder="请输入综合评估"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
-
-          {/* 备注 */}
-          <Card title="备注" size="small">
-            <Form.Item name="remark">
-              <TextArea
-                rows={3}
-                placeholder="请输入备注"
-              />
-            </Form.Item>
-          </Card>
         </Form>
       </Card>
     </div>
