@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getEquipmentList,
   deleteEquipment,
@@ -8,6 +8,9 @@ import {
   EquipmentQueryParams,
 } from '@/api/equipment';
 import EquipmentModal from './EquipmentModal';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './EquipmentList.less';
 
 const EquipmentList: React.FC = () => {
@@ -21,6 +24,7 @@ const EquipmentList: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<EquipmentInfo | null>(null);
+  const { isMobile } = useResponsive();
 
   const fetchList = async () => {
     setLoading(true);
@@ -80,6 +84,16 @@ const EquipmentList: React.FC = () => {
     setPagination({ ...pagination, current: page, pageSize });
   };
 
+  const renderStatus = (status: number) => {
+    const statusMap: Record<number, { text: string; color: string }> = {
+      0: { text: '停用', color: 'default' },
+      1: { text: '正常', color: 'success' },
+      2: { text: '维修中', color: 'warning' },
+    };
+    const statusInfo = statusMap[status] || { text: '未知', color: 'default' };
+    return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
+  };
+
   const columns = [
     {
       title: '设备编号',
@@ -116,15 +130,7 @@ const EquipmentList: React.FC = () => {
       dataIndex: 'status',
       key: 'status',
       width: 100,
-      render: (status: number) => {
-        const statusMap: Record<number, { text: string; color: string }> = {
-          0: { text: '停用', color: 'default' },
-          1: { text: '正常', color: 'success' },
-          2: { text: '维修中', color: 'warning' },
-        };
-        const statusInfo = statusMap[status] || { text: '未知', color: 'default' };
-        return <Tag color={statusInfo.color}>{statusInfo.text}</Tag>;
-      },
+      render: renderStatus,
     },
     {
       title: '操作',
@@ -146,60 +152,97 @@ const EquipmentList: React.FC = () => {
     },
   ];
 
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'equipmentNo', label: '编号' },
+    { key: 'groupName', label: '组别' },
+    { key: 'machineNo', label: '机台号' },
+    { key: 'equipmentModel', label: '型号' },
+    {
+      key: 'status',
+      label: '状态',
+      render: renderStatus,
+    },
+  ];
+
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id),
+    },
+  ];
+
   return (
-    <div className="equipment-list-container">
-      <div className="search-form">
-        <Form form={form} layout="inline">
-          <Form.Item name="equipmentNo">
-            <Input placeholder="设备编号" allowClear />
-          </Form.Item>
-          <Form.Item name="equipmentName">
-            <Input placeholder="设备名称" allowClear />
-          </Form.Item>
-          <Form.Item name="groupName">
-            <Input placeholder="组别" allowClear />
-          </Form.Item>
-          <Form.Item name="status">
-            <Select placeholder="状态" allowClear style={{ width: 120 }}>
-              <Select.Option value={0}>停用</Select.Option>
-              <Select.Option value={1}>正常</Select.Option>
-              <Select.Option value={2}>维修中</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={handleSearch}>
-                查询
-              </Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+    <div className={`equipment-list-container ${isMobile ? 'equipment-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            {isMobile ? '新增' : '新增设备'}
+          </Button>
+        }
+      >
+        <Form.Item name="equipmentNo" label={isMobile ? '设备编号' : undefined}>
+          <Input placeholder="设备编号" allowClear />
+        </Form.Item>
+        <Form.Item name="equipmentName" label={isMobile ? '设备名称' : undefined}>
+          <Input placeholder="设备名称" allowClear />
+        </Form.Item>
+        <Form.Item name="groupName" label={isMobile ? '组别' : undefined}>
+          <Input placeholder="组别" allowClear />
+        </Form.Item>
+        <Form.Item name="status" label={isMobile ? '状态' : undefined}>
+          <Select placeholder="状态" allowClear style={{ width: isMobile ? '100%' : 120 }}>
+            <Select.Option value={0}>停用</Select.Option>
+            <Select.Option value={1}>正常</Select.Option>
+            <Select.Option value={2}>维修中</Select.Option>
+          </Select>
+        </Form.Item>
+      </ResponsiveSearch>
 
-      <div className="toolbar">
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增设备
-        </Button>
-        <Button icon={<ReloadOutlined />} onClick={fetchList}>
-          刷新
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: 1200 }}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-        }}
-      />
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'equipmentName', label: '设备名称' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange,
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 1200 }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: handleTableChange,
+          }}
+        />
+      )}
 
       <EquipmentModal
         visible={modalVisible}

@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, LockOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, LockOutlined } from '@ant-design/icons';
 import { getUserList, deleteUser, resetPassword, enableUser, disableUser, UserInfo, UserQueryParams } from '@/api/user';
 import UserModal from './UserModal';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './UserList.less';
 
 const UserList: React.FC = () => {
@@ -16,6 +19,7 @@ const UserList: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserInfo | null>(null);
+  const { isMobile } = useResponsive();
 
   const fetchList = async () => {
     setLoading(true);
@@ -100,6 +104,7 @@ const UserList: React.FC = () => {
     fetchList();
   };
 
+  // PC 端表格列配置
   const columns = [
     {
       title: '用户名',
@@ -199,55 +204,128 @@ const UserList: React.FC = () => {
     },
   ];
 
-  return (
-    <div className="user-list-container">
-      <div className="user-list-header">
-        <Form form={form} layout="inline">
-          <Form.Item name="username">
-            <Input placeholder="用户名" allowClear />
-          </Form.Item>
-          <Form.Item name="realName">
-            <Input placeholder="真实姓名" allowClear />
-          </Form.Item>
-          <Form.Item name="status">
-            <Select placeholder="状态" style={{ width: 120 }} allowClear>
-              <Select.Option value={1}>启用</Select.Option>
-              <Select.Option value={0}>禁用</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={handleSearch}>
-                查询
-              </Button>
-              <Button onClick={handleReset} icon={<ReloadOutlined />}>
-                重置
-              </Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                新增用户
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'phone', label: '手机号' },
+    { key: 'email', label: '邮箱' },
+    {
+      key: 'status',
+      label: '状态',
+      render: (value: number) => (
+        <Tag color={value === 1 ? 'success' : 'error'}>
+          {value === 1 ? '启用' : '禁用'}
+        </Tag>
+      ),
+    },
+    {
+      key: 'roles',
+      label: '角色',
+      render: (_: any, record: UserInfo) => {
+        if (record.roles && record.roles.length > 0) {
+          return record.roles.map((r) => r.roleName).join(', ');
+        }
+        return '-';
+      },
+    },
+  ];
 
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        loading={loading}
-        rowKey="id"
-        scroll={{ x: 1200 }}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, pageSize) => {
-            setPagination({ ...pagination, current: page, pageSize: pageSize || 10 });
-          },
-        }}
-      />
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'toggle',
+      label: '启用/禁用',
+      onClick: (record) => {
+        if (record.status === 1) {
+          handleDisable(record.id);
+        } else {
+          handleEnable(record.id);
+        }
+      },
+    },
+    {
+      key: 'reset',
+      label: '重置密码',
+      icon: <LockOutlined />,
+      onClick: (record) => handleResetPassword(record.id),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id),
+    },
+  ];
+
+  return (
+    <div className={`user-list-container ${isMobile ? 'user-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            {isMobile ? '新增' : '新增用户'}
+          </Button>
+        }
+      >
+        <Form.Item name="username" label={isMobile ? '用户名' : undefined}>
+          <Input placeholder="用户名" allowClear />
+        </Form.Item>
+        <Form.Item name="realName" label={isMobile ? '真实姓名' : undefined}>
+          <Input placeholder="真实姓名" allowClear />
+        </Form.Item>
+        <Form.Item name="status" label={isMobile ? '状态' : undefined}>
+          <Select placeholder="状态" style={{ width: isMobile ? '100%' : 120 }} allowClear>
+            <Select.Option value={1}>启用</Select.Option>
+            <Select.Option value={0}>禁用</Select.Option>
+          </Select>
+        </Form.Item>
+      </ResponsiveSearch>
+
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'username', label: '用户名' }}
+          subtitleField={{ key: 'name', label: '姓名' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize: pageSize || 10 });
+            },
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          scroll={{ x: 1200 }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, pageSize) => {
+              setPagination({ ...pagination, current: page, pageSize: pageSize || 10 });
+            },
+          }}
+        />
+      )}
 
       <UserModal
         visible={modalVisible}

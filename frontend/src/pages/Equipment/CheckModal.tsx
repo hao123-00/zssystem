@@ -8,6 +8,7 @@ import {
   getCheckById,
 } from '@/api/equipment';
 import { getEquipmentList } from '@/api/equipment';
+import { useResponsive } from '@/hooks/useResponsive';
 import './CheckModal.less';
 
 interface CheckModalProps {
@@ -21,6 +22,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -95,6 +97,10 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
     }
   };
 
+  // 响应式列宽
+  const colSpan = isMobile ? 24 : 12;
+  const checkItemColSpan = isMobile ? 24 : 8;
+
   return (
     <Modal
       title={check ? '编辑点检记录' : '新增点检记录'}
@@ -102,7 +108,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
       onOk={handleSubmit}
       onCancel={onCancel}
       confirmLoading={loading}
-      width={900}
+      width={isMobile ? '100%' : 900}
       destroyOnClose
     >
       <Form
@@ -116,7 +122,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
           <Input />
         </Form.Item>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col span={colSpan}>
             <Form.Item
               name="equipmentId"
               label="设备"
@@ -135,7 +141,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col span={colSpan}>
             <Form.Item
               name="checkDate"
               label="检查日期"
@@ -146,7 +152,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
           </Col>
         </Row>
         <Row gutter={16}>
-          <Col span={12}>
+          <Col span={colSpan}>
             <Form.Item
               name="checkerName"
               label="检点人"
@@ -159,23 +165,23 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
 
         <Divider orientation="left">电路部分</Divider>
         <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item name="circuitItem1" label="发热圈/感温线/交流接触器温度控制器">
+          <Col span={checkItemColSpan}>
+            <Form.Item name="circuitItem1" label="发热圈/感温线/温度控制器">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
                 <Select.Option value={0}>异常</Select.Option>
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
-            <Form.Item name="circuitItem2" label="电箱排风扇/安全门开关/烘料斗温度">
+          <Col span={checkItemColSpan}>
+            <Form.Item name="circuitItem2" label="电箱排风扇/安全门开关">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
                 <Select.Option value={0}>异常</Select.Option>
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="circuitItem3" label="形成开关">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -187,7 +193,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
 
         <Divider orientation="left">机架部分</Divider>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="frameItem1" label="哥林柱、机架螺母">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -195,7 +201,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="frameItem2" label="安全挡板/射咀/低压保护">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -203,7 +209,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="frameItem3" label="调模牙盘变形及余音">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -215,7 +221,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
 
         <Divider orientation="left">油路部分</Divider>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="oilItem1" label="油泵压力/动作">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -223,7 +229,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="oilItem2" label="油泵/溶胶/马达杂音">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -231,7 +237,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="oilItem3" label="油温/冷却器">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -239,7 +245,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="oilItem4" label="自动加油润滑油管">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -247,7 +253,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="oilItem5" label="机台油管漏油">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -259,7 +265,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
 
         <Divider orientation="left">周边设备</Divider>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="peripheralItem1" label="模温机、冻水机异响">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -267,7 +273,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="peripheralItem2" label="模温机冷却水、过滤网">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -275,7 +281,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="peripheralItem3" label="油温机缺油、温度">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -283,7 +289,7 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
+          <Col span={checkItemColSpan}>
             <Form.Item name="peripheralItem4" label="冻水机过滤网、运水">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
@@ -291,8 +297,8 @@ const CheckModal: React.FC<CheckModalProps> = ({ visible, check, onCancel, onSuc
               </Select>
             </Form.Item>
           </Col>
-          <Col span={8}>
-            <Form.Item name="peripheralItem5" label="冻水机制冷系统、交流触感器">
+          <Col span={checkItemColSpan}>
+            <Form.Item name="peripheralItem5" label="冻水机制冷系统">
               <Select placeholder="请选择状态" style={{ width: '100%' }}>
                 <Select.Option value={1}>正常</Select.Option>
                 <Select.Option value={0}>异常</Select.Option>

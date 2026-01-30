@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, message } from 'antd';
 import { UserInfo, UserSaveParams, createUser, updateUser, getUserById } from '@/api/user';
 import { getAllRoles, RoleInfo } from '@/api/role';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface UserModalProps {
   visible: boolean;
@@ -14,6 +15,7 @@ const UserModal: React.FC<UserModalProps> = ({ visible, user, onCancel, onSucces
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [roleList, setRoleList] = useState<RoleInfo[]>([]);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -89,7 +91,7 @@ const UserModal: React.FC<UserModalProps> = ({ visible, user, onCancel, onSucces
       onOk={handleSubmit}
       onCancel={onCancel}
       confirmLoading={loading}
-      width={600}
+      width={isMobile ? '100%' : 600}
       destroyOnClose
     >
       <Form

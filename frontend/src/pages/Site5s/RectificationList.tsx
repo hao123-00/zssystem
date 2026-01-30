@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag, DatePicker } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getSite5sRectificationList,
   deleteSite5sRectification,
@@ -8,7 +8,9 @@ import {
   Site5sRectificationQueryParams,
 } from '@/api/site5s';
 import RectificationModal from './RectificationModal';
-import dayjs from 'dayjs';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './RectificationList.less';
 
 const RectificationList: React.FC = () => {
@@ -22,6 +24,7 @@ const RectificationList: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRectification, setEditingRectification] = useState<Site5sRectificationInfo | null>(null);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     fetchList();
@@ -202,74 +205,113 @@ const RectificationList: React.FC = () => {
     },
   ];
 
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'area', label: '区域' },
+    { key: 'responsiblePerson', label: '责任人' },
+    { key: 'deadline', label: '期限' },
+    {
+      key: 'status',
+      label: '状态',
+      render: (value: number) => getStatusTag(value),
+    },
+    { key: 'problemDescription', label: '问题' },
+  ];
+
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id!),
+    },
+  ];
+
   return (
-    <div className="site5s-rectification-list">
-      <Form form={form} layout="inline" className="search-form">
-        <Form.Item name="taskNo" label="任务编号">
+    <div className={`site5s-rectification-list ${isMobile ? 'site5s-rectification-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            {isMobile ? '新增' : '新增整改任务'}
+          </Button>
+        }
+      >
+        <Form.Item name="taskNo" label={isMobile ? '编号' : '任务编号'}>
           <Input placeholder="请输入任务编号" allowClear />
         </Form.Item>
         <Form.Item name="area" label="区域">
           <Input placeholder="请输入区域" allowClear />
         </Form.Item>
-        <Form.Item name="department" label="责任部门">
-          <Input placeholder="请输入责任部门" allowClear />
-        </Form.Item>
-        <Form.Item name="responsiblePerson" label="责任人">
-          <Input placeholder="请输入责任人" allowClear />
-        </Form.Item>
+        {!isMobile && (
+          <>
+            <Form.Item name="department" label="责任部门">
+              <Input placeholder="请输入责任部门" allowClear />
+            </Form.Item>
+            <Form.Item name="responsiblePerson" label="责任人">
+              <Input placeholder="请输入责任人" allowClear />
+            </Form.Item>
+          </>
+        )}
         <Form.Item name="status" label="状态">
-          <Select placeholder="请选择状态" allowClear style={{ width: 120 }}>
+          <Select placeholder="请选择状态" allowClear style={{ width: isMobile ? '100%' : 120 }}>
             <Select.Option value={0}>待整改</Select.Option>
             <Select.Option value={1}>整改中</Select.Option>
             <Select.Option value={2}>待验证</Select.Option>
             <Select.Option value={3}>已完成</Select.Option>
           </Select>
         </Form.Item>
-        <Form.Item name="deadline" label="整改期限">
-          <DatePicker format="YYYY-MM-DD" placeholder="请选择整改期限" />
-        </Form.Item>
-        <Form.Item>
-          <Space>
-            <Button type="primary" onClick={handleSearch}>
-              查询
-            </Button>
-            <Button onClick={handleReset}>重置</Button>
-          </Space>
-        </Form.Item>
-      </Form>
+        {!isMobile && (
+          <Form.Item name="deadline" label="整改期限">
+            <DatePicker format="YYYY-MM-DD" placeholder="请选择整改期限" />
+          </Form.Item>
+        )}
+      </ResponsiveSearch>
 
-      <div className="table-toolbar">
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAdd}
-        >
-          新增整改任务
-        </Button>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={fetchList}
-        >
-          刷新
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-          onShowSizeChange: handleTableChange,
-        }}
-        scroll={{ x: 1500 }}
-      />
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'taskNo', label: '任务编号' }}
+          subtitleField={{ key: 'department', label: '责任部门' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange,
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange,
+          }}
+          scroll={{ x: 1500 }}
+        />
+      )}
 
       <RectificationModal
         visible={modalVisible}

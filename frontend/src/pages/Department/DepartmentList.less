@@ -1,6 +1,7 @@
 .department-list-container {
   padding: 24px;
   background: #fff;
+  border-radius: 8px;
 
   .toolbar {
     margin-bottom: 16px;
@@ -18,6 +19,10 @@
     align-items: center;
     width: 100%;
 
+    .tree-node-name {
+      flex-shrink: 0;
+    }
+
     .tree-node-code {
       color: #999;
       margin-left: 8px;
@@ -32,6 +37,47 @@
 
     &:hover .tree-node-actions {
       opacity: 1;
+    }
+
+    // 移动端树节点样式
+    &.tree-node-title-mobile {
+      .tree-node-more {
+        margin-left: auto;
+        opacity: 1;
+      }
+    }
+  }
+}
+
+// 移动端样式
+.department-list-mobile {
+  padding: 12px;
+  background: #fff;
+
+  .toolbar {
+    margin-bottom: 12px;
+  }
+
+  .tree-container {
+    min-height: 300px;
+    padding: 12px;
+  }
+
+  .ant-tree {
+    .ant-tree-node-content-wrapper {
+      padding: 4px 0;
+    }
+
+    .ant-tree-title {
+      width: 100%;
+    }
+  }
+
+  .tree-node-title {
+    font-size: 14px;
+
+    .tree-node-code {
+      display: none;
     }
   }
 }

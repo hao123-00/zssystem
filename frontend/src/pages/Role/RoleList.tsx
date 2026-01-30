@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag, Modal } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import {
   getRoleList,
-  createRole,
-  updateRole,
   deleteRole,
   getRoleById,
   RoleInfo,
   RoleQueryParams,
-  RoleSaveParams,
 } from '@/api/role';
 import { getPermissionTree, PermissionTreeVO } from '@/api/permission';
 import { assignPermissions, getRolePermissions } from '@/api/role';
 import PermissionTree from '@/components/PermissionTree/PermissionTree';
 import RoleModal from './RoleModal';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './RoleList.less';
 
 const RoleList: React.FC = () => {
@@ -32,6 +32,7 @@ const RoleList: React.FC = () => {
   const [currentRoleId, setCurrentRoleId] = useState<number | null>(null);
   const [permissionTree, setPermissionTree] = useState<PermissionTreeVO[]>([]);
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
+  const { isMobile } = useResponsive();
 
   const fetchList = async () => {
     setLoading(true);
@@ -188,52 +189,95 @@ const RoleList: React.FC = () => {
     },
   ];
 
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'roleCode', label: '编码' },
+    { key: 'description', label: '描述' },
+    {
+      key: 'status',
+      label: '状态',
+      render: (value: number) => (
+        <Tag color={value === 1 ? 'green' : 'red'}>{value === 1 ? '启用' : '禁用'}</Tag>
+      ),
+    },
+  ];
+
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'permission',
+      label: '分配权限',
+      icon: <SettingOutlined />,
+      onClick: (record) => handleAssignPermissions(record.id),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id),
+    },
+  ];
+
   return (
-    <div className="role-list-container">
-      <div className="search-form">
-        <Form form={form} layout="inline">
-          <Form.Item name="roleName">
-            <Input placeholder="角色名称" allowClear />
-          </Form.Item>
-          <Form.Item name="status">
-            <Select placeholder="状态" allowClear style={{ width: 120 }}>
-              <Select.Option value={1}>启用</Select.Option>
-              <Select.Option value={0}>禁用</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={handleSearch}>
-                查询
-              </Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+    <div className={`role-list-container ${isMobile ? 'role-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            {isMobile ? '新增' : '新增角色'}
+          </Button>
+        }
+      >
+        <Form.Item name="roleName" label={isMobile ? '角色名称' : undefined}>
+          <Input placeholder="角色名称" allowClear />
+        </Form.Item>
+        <Form.Item name="status" label={isMobile ? '状态' : undefined}>
+          <Select placeholder="状态" allowClear style={{ width: isMobile ? '100%' : 120 }}>
+            <Select.Option value={1}>启用</Select.Option>
+            <Select.Option value={0}>禁用</Select.Option>
+          </Select>
+        </Form.Item>
+      </ResponsiveSearch>
 
-      <div className="toolbar">
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增角色
-        </Button>
-        <Button icon={<ReloadOutlined />} onClick={fetchList}>
-          刷新
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-        }}
-      />
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'roleName', label: '角色名称' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange,
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: handleTableChange,
+          }}
+        />
+      )}
 
       <RoleModal
         visible={modalVisible}
@@ -250,7 +294,8 @@ const RoleList: React.FC = () => {
         open={permissionModalVisible}
         onOk={handleSavePermissions}
         onCancel={() => setPermissionModalVisible(false)}
-        width={600}
+        width={isMobile ? '100%' : 600}
+        className={isMobile ? '' : undefined}
       >
         <PermissionTree
           value={selectedPermissions}

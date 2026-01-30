@@ -11,8 +11,11 @@ import {
   Col,
   Space,
   Modal,
+  Upload,
+  Image,
 } from 'antd';
-import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import type { UploadFile, UploadProps } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getEquipmentList } from '@/api/equipment';
 import { saveProcessFileForm } from '@/api/processFile';
@@ -27,6 +30,10 @@ const ProcessFileForm: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
+  const [keyDimensionImage1, setKeyDimensionImage1] = useState<UploadFile[]>([]);
+  const [keyDimensionImage2, setKeyDimensionImage2] = useState<UploadFile[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
   const navigate = useNavigate();
   const { id } = useParams(); // 修改时传入文件ID
 
@@ -62,10 +69,33 @@ const ProcessFileForm: React.FC = () => {
       const values = await form.validateFields();
       
       setLoading(true);
-      const response = await saveProcessFileForm({
-        ...values,
-        id: id ? Number(id) : undefined,
+      
+      // 构建 FormData 以支持文件上传
+      const formData = new FormData();
+      
+      // 添加表单字段
+      Object.keys(values).forEach(key => {
+        if (values[key] !== undefined && values[key] !== null) {
+          formData.append(key, values[key]);
+        }
       });
+      
+      // 添加ID（如果是修改）
+      if (id) {
+        formData.append('id', id);
+      }
+      
+      // 添加产品关键尺寸图片1
+      if (keyDimensionImage1.length > 0 && keyDimensionImage1[0].originFileObj) {
+        formData.append('keyDimensionImage1', keyDimensionImage1[0].originFileObj);
+      }
+      
+      // 添加产品关键尺寸图片2
+      if (keyDimensionImage2.length > 0 && keyDimensionImage2[0].originFileObj) {
+        formData.append('keyDimensionImage2', keyDimensionImage2[0].originFileObj);
+      }
+      
+      const response = await saveProcessFileForm(formData);
       
       message.success('保存成功');
       
@@ -94,6 +124,34 @@ const ProcessFileForm: React.FC = () => {
         navigate('/production/process-file');
       },
     });
+  };
+
+  // 图片转 Base64
+  const getBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // 图片预览
+  const handlePreview = async (file: UploadFile) => {
+    if (!file.url && !file.preview) {
+      file.preview = await getBase64(file.originFileObj as File);
+    }
+    setPreviewImage(file.url || (file.preview as string));
+    setPreviewOpen(true);
+  };
+
+  // 图片上传配置
+  const uploadProps: UploadProps = {
+    beforeUpload: () => false, // 阻止自动上传，由表单提交时处理
+    listType: 'picture-card',
+    maxCount: 1,
+    accept: 'image/*',
+    onPreview: handlePreview,
   };
 
   return (
@@ -131,6 +189,28 @@ const ProcessFileForm: React.FC = () => {
           {/* 表头信息 */}
           <Card title="基本信息" size="small" style={{ marginBottom: 16 }}>
             <Row gutter={16}>
+              {!id && (
+                <>
+                  <Col span={8}>
+                    <Form.Item
+                      label="工艺文件编号"
+                      name="fileNo"
+                      rules={[{ required: true, message: '请输入工艺文件编号' }]}
+                    >
+                      <Input placeholder="请输入工艺文件编号" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item
+                      label="文件名称"
+                      name="fileName"
+                      rules={[{ required: true, message: '请输入文件名称' }]}
+                    >
+                      <Input placeholder="请输入文件名称" />
+                    </Form.Item>
+                  </Col>
+                </>
+              )}
               <Col span={8}>
                 <Form.Item
                   label="产品型号"
@@ -301,12 +381,36 @@ const ProcessFileForm: React.FC = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col span={24}>
-                <Form.Item label="产品关键尺寸" name="productKeyDimensions">
-                  <TextArea
-                    rows={4}
-                    placeholder="请输入产品关键尺寸"
-                  />
+              <Col span={12}>
+                <Form.Item label="产品关键尺寸图片1">
+                  <Upload
+                    {...uploadProps}
+                    fileList={keyDimensionImage1}
+                    onChange={({ fileList }) => setKeyDimensionImage1(fileList)}
+                  >
+                    {keyDimensionImage1.length === 0 && (
+                      <div>
+                        <PlusOutlined />
+                        <div style={{ marginTop: 8 }}>上传图片1</div>
+                      </div>
+                    )}
+                  </Upload>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="产品关键尺寸图片2">
+                  <Upload
+                    {...uploadProps}
+                    fileList={keyDimensionImage2}
+                    onChange={({ fileList }) => setKeyDimensionImage2(fileList)}
+                  >
+                    {keyDimensionImage2.length === 0 && (
+                      <div>
+                        <PlusOutlined />
+                        <div style={{ marginTop: 8 }}>上传图片2</div>
+                      </div>
+                    )}
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
@@ -838,6 +942,16 @@ const ProcessFileForm: React.FC = () => {
           </Card>
         </Form>
       </Card>
+      
+      {/* 图片预览 */}
+      <Image
+        style={{ display: 'none' }}
+        preview={{
+          visible: previewOpen,
+          src: previewImage,
+          onVisibleChange: (visible) => setPreviewOpen(visible),
+        }}
+      />
     </div>
   );
 };

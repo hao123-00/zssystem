@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag, DatePicker } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Form, Input, Space, message, Popconfirm, Tag, DatePicker } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getSite5sCheckList,
   deleteSite5sCheck,
@@ -8,7 +8,9 @@ import {
   Site5sCheckQueryParams,
 } from '@/api/site5s';
 import CheckModal from './CheckModal';
-import dayjs from 'dayjs';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './CheckList.less';
 
 const CheckList: React.FC = () => {
@@ -22,6 +24,7 @@ const CheckList: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCheck, setEditingCheck] = useState<Site5sCheckInfo | null>(null);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     fetchList();
@@ -199,60 +202,96 @@ const CheckList: React.FC = () => {
     },
   ];
 
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'checkArea', label: '区域' },
+    { key: 'checkerName', label: '检查人' },
+    {
+      key: 'totalScore',
+      label: '总分',
+      render: (value: number | undefined) => {
+        if (value == null) return '-';
+        const color = value >= 90 ? 'green' : value >= 70 ? 'orange' : 'red';
+        return <Tag color={color}>{value}/100</Tag>;
+      },
+    },
+    { key: 'problemDescription', label: '问题' },
+  ];
+
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id!),
+    },
+  ];
+
   return (
-    <div className="site5s-check-list">
-      <Form form={form} layout="inline" className="search-form">
-        <Form.Item name="checkDate" label="检查日期">
-          <DatePicker format="YYYY-MM-DD" placeholder="请选择检查日期" />
+    <div className={`site5s-check-list ${isMobile ? 'site5s-check-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            {isMobile ? '新增' : '新增检查记录'}
+          </Button>
+        }
+      >
+        <Form.Item name="checkDate" label={isMobile ? '日期' : '检查日期'}>
+          <DatePicker format="YYYY-MM-DD" placeholder="请选择检查日期" style={{ width: isMobile ? '100%' : undefined }} />
         </Form.Item>
-        <Form.Item name="checkArea" label="检查区域">
+        <Form.Item name="checkArea" label={isMobile ? '区域' : '检查区域'}>
           <Input placeholder="请输入检查区域" allowClear />
         </Form.Item>
-        <Form.Item name="checkerName" label="检查人员">
+        <Form.Item name="checkerName" label={isMobile ? '检查人' : '检查人员'}>
           <Input placeholder="请输入检查人员" allowClear />
         </Form.Item>
-        <Form.Item>
-          <Space>
-            <Button type="primary" onClick={handleSearch}>
-              查询
-            </Button>
-            <Button onClick={handleReset}>重置</Button>
-          </Space>
-        </Form.Item>
-      </Form>
+      </ResponsiveSearch>
 
-      <div className="table-toolbar">
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAdd}
-        >
-          新增检查记录
-        </Button>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={fetchList}
-        >
-          刷新
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-          onShowSizeChange: handleTableChange,
-        }}
-        scroll={{ x: 1500 }}
-      />
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'checkNo', label: '检查单号' }}
+          subtitleField={{ key: 'checkDate', label: '检查日期' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange,
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: handleTableChange,
+            onShowSizeChange: handleTableChange,
+          }}
+          scroll={{ x: 1500 }}
+        />
+      )}
 
       <CheckModal
         visible={modalVisible}

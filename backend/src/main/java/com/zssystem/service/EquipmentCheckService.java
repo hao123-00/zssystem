@@ -10,4 +10,11 @@ public interface EquipmentCheckService {
     EquipmentCheckVO getCheckById(Long id);
     void saveCheck(EquipmentCheckSaveDTO saveDTO);
     void deleteCheck(Long id);
+    /**
+     * 导出某设备某月30天点检记录为 Excel
+     * @param equipmentId 设备ID
+     * @param checkMonth 月份 yyyy-MM
+     * @return Excel 文件字节
+     */
+    byte[] exportCheckExcel(Long equipmentId, String checkMonth) throws java.io.IOException;
 }

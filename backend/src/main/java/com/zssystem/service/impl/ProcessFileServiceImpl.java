@@ -63,18 +63,19 @@ public class ProcessFileServiceImpl implements ProcessFileService {
     private static final Map<Integer, String> STATUS_MAP = new HashMap<>();
     private static final Map<Integer, String> APPROVAL_LEVEL_MAP = new HashMap<>();
     
+    // 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3)
     static {
         STATUS_MAP.put(0, "草稿");
         STATUS_MAP.put(1, "待车间主任审核");
-        STATUS_MAP.put(2, "待注塑部经理会签");
-        STATUS_MAP.put(3, "待生产技术部经理批准");
+        STATUS_MAP.put(2, "待生产技术部经理批准");
+        STATUS_MAP.put(3, "待注塑部经理会签");
         STATUS_MAP.put(5, "已批准（生效中）");
         STATUS_MAP.put(-1, "已驳回");
         STATUS_MAP.put(-2, "已作废");
         
         APPROVAL_LEVEL_MAP.put(1, "车间主任审核");
-        APPROVAL_LEVEL_MAP.put(2, "注塑部经理会签");
-        APPROVAL_LEVEL_MAP.put(3, "生产技术部经理批准");
+        APPROVAL_LEVEL_MAP.put(2, "生产技术部经理批准");
+        APPROVAL_LEVEL_MAP.put(3, "注塑部经理会签");
     }
 
     @Override
@@ -246,15 +247,35 @@ public class ProcessFileServiceImpl implements ProcessFileService {
             processFileDetail = new com.zssystem.entity.ProcessFileDetail();
         }
         
-        // 2. 生成文件编号
-        String fileNo = generateFileNo();
+        // 2. 文件编号与文件名称
+        String fileNo;
+        String fileName;
+        if (isUpdate) {
+            fileNo = generateFileNo();
+            fileName = "注塑工艺卡片_" + fileNo + ".xlsx";
+        } else {
+            // 新建：使用表单手动填写的工艺文件编号和文件名称
+            String rawNo = formDTO.getFileNo();
+            String rawName = formDTO.getFileName();
+            if (rawNo == null || rawNo.trim().isEmpty()) {
+                throw new RuntimeException("请输入工艺文件编号");
+            }
+            if (rawName == null || rawName.trim().isEmpty()) {
+                throw new RuntimeException("请输入文件名称");
+            }
+            fileNo = rawNo.trim();
+            fileName = rawName.trim();
+            if (fileNo.contains("/") || fileNo.contains("\\") || fileNo.contains("..")) {
+                throw new RuntimeException("工艺文件编号不能包含 / \\ 或 ..");
+            }
+        }
         
         // 3. 填充工艺文件主表数据
         processFile.setFileNo(fileNo);
         processFile.setEquipmentId(equipment.getId());
         processFile.setEquipmentNo(equipment.getEquipmentNo());
         processFile.setMachineNo(equipment.getMachineNo());
-        processFile.setFileName("注塑工艺卡片_" + fileNo + ".xlsx"); // 虚拟文件名
+        processFile.setFileName(fileName);
         processFile.setFilePath(""); // 表单方式不需要文件路径
         processFile.setFileSize(0L);
         processFile.setFileType("form"); // 标识为表单方式
@@ -282,6 +303,59 @@ public class ProcessFileServiceImpl implements ProcessFileService {
         }
         
         return processFile.getId();
+    }
+    
+    @Override
+    @Transactional
+    public Long saveProcessFileForm(com.zssystem.dto.ProcessFileFormDTO formDTO, Long currentUserId, String currentUserName,
+                                   org.springframework.web.multipart.MultipartFile keyDimensionImage1,
+                                   org.springframework.web.multipart.MultipartFile keyDimensionImage2) {
+        // 1. 处理产品关键尺寸图片上传
+        String image1Path = null;
+        String image2Path = null;
+        
+        if (keyDimensionImage1 != null && !keyDimensionImage1.isEmpty()) {
+            image1Path = saveKeyDimensionImage(keyDimensionImage1, "image1");
+            formDTO.setProductKeyDimensionImage1(image1Path);
+        }
+        
+        if (keyDimensionImage2 != null && !keyDimensionImage2.isEmpty()) {
+            image2Path = saveKeyDimensionImage(keyDimensionImage2, "image2");
+            formDTO.setProductKeyDimensionImage2(image2Path);
+        }
+        
+        // 2. 调用原有的保存方法
+        return saveProcessFileForm(formDTO, currentUserId, currentUserName);
+    }
+    
+    /**
+     * 保存产品关键尺寸图片
+     */
+    private String saveKeyDimensionImage(org.springframework.web.multipart.MultipartFile file, String imageType) {
+        try {
+            // 生成保存路径
+            String yearMonth = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy/MM"));
+            String saveDir = uploadPath + "/key-dimensions/" + yearMonth;
+            com.zssystem.util.FileUtil.createDirectoryIfNotExists(saveDir);
+            
+            // 生成文件名
+            String originalFilename = file.getOriginalFilename();
+            String extension = originalFilename != null && originalFilename.contains(".") 
+                ? originalFilename.substring(originalFilename.lastIndexOf(".")) 
+                : ".png";
+            String fileName = "KD_" + imageType + "_" + System.currentTimeMillis() + extension;
+            String filePath = saveDir + "/" + fileName;
+            
+            // 保存文件
+            file.transferTo(new java.io.File(filePath));
+            
+            System.out.println("产品关键尺寸图片保存成功: " + filePath);
+            return filePath;
+        } catch (Exception e) {
+            System.err.println("保存产品关键尺寸图片失败: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("保存图片失败: " + e.getMessage());
+        }
     }
     
     @Override
@@ -366,6 +440,26 @@ public class ProcessFileServiceImpl implements ProcessFileService {
         processFile.setStatus(-2); // 已作废
         processFile.setInvalidTime(LocalDateTime.now());
         processFileMapper.updateById(processFile);
+    }
+    
+    @Override
+    @Transactional
+    public int batchInvalidateByEquipmentId(Long equipmentId, Long currentUserId) {
+        if (equipmentId == null) {
+            throw new RuntimeException("请选择设备（机台）");
+        }
+        List<ProcessFile> list = processFileMapper.selectList(
+            new LambdaQueryWrapper<ProcessFile>()
+                .eq(ProcessFile::getEquipmentId, equipmentId)
+                .notIn(ProcessFile::getStatus, -2) // 排除已作废的
+        );
+        LocalDateTime now = LocalDateTime.now();
+        for (ProcessFile pf : list) {
+            pf.setStatus(-2);
+            pf.setInvalidTime(now);
+            processFileMapper.updateById(pf);
+        }
+        return list.size();
     }
     
     @Override
@@ -461,11 +555,13 @@ public class ProcessFileServiceImpl implements ProcessFileService {
                         System.out.println("查询到 " + (signatures != null ? signatures.size() : 0) + " 个签名");
                         
                         if (signatures != null && !signatures.isEmpty()) {
-                            for (com.zssystem.vo.ProcessFileSignatureVO signature : signatures) {
+                            System.out.println("========== 开始处理签名列表 ==========");
+                            for (int i = 0; i < signatures.size(); i++) {
+                                com.zssystem.vo.ProcessFileSignatureVO signature = signatures.get(i);
                                 String signatureType = signature.getSignatureType();
                                 String signatureImagePath = signature.getSignatureImagePath();
                                 
-                                System.out.println("处理签名 - 类型: " + signatureType + ", 路径: " + signatureImagePath);
+                                System.out.println("签名[" + (i+1) + "/" + signatures.size() + "] - 类型: " + signatureType + ", 路径: " + signatureImagePath);
                                 
                                 if (signatureImagePath != null && !signatureImagePath.isEmpty()) {
                                     // 检查签名图片文件是否存在
@@ -534,6 +630,15 @@ public class ProcessFileServiceImpl implements ProcessFileService {
                     e.printStackTrace();
                     // 不阻止下载，但记录错误
                 }
+            }
+        }
+        
+        // 会签完成（状态5）时在 Excel 区域 L24:P27 加盖受控章
+        if (file.getStatus() != null && file.getStatus() == 5) {
+            try {
+                com.zssystem.util.ProcessFileExcelUtil.insertControlledSealToExcel(excelFilePath);
+            } catch (Exception e) {
+                System.err.println("插入受控章失败: " + e.getMessage());
             }
         }
         
@@ -683,24 +788,26 @@ public class ProcessFileServiceImpl implements ProcessFileService {
     
     /**
      * 获取当前审批级别
+     * 审批流程：车间主任审核(状态1) → 生产技术部经理批准(状态2) → 注塑部经理会签(状态3)
      */
     private int getCurrentApprovalLevel(int status) {
         return switch (status) {
             case 1 -> 1; // 车间主任审核
-            case 2 -> 2; // 注塑部经理会签
-            case 3 -> 3; // 生产技术部经理批准
+            case 2 -> 2; // 生产技术部经理批准
+            case 3 -> 3; // 注塑部经理会签
             default -> throw new RuntimeException("当前状态不需要审批");
         };
     }
     
     /**
      * 根据审批级别获取签名类型
+     * APPROVE_LEVEL1=审核人(车间主任), APPROVE_LEVEL2=批准人(生产技术部经理), APPROVE_LEVEL3=会签(注塑部经理)
      */
     private String getSignatureTypeByApprovalLevel(int approvalLevel) {
         return switch (approvalLevel) {
-            case 1 -> "APPROVE_LEVEL1"; // 审核人
-            case 2 -> "APPROVE_LEVEL2"; // 会签
-            case 3 -> "APPROVE_LEVEL3"; // 批准人
+            case 1 -> "APPROVE_LEVEL1"; // 审核人（车间主任）
+            case 2 -> "APPROVE_LEVEL2"; // 批准人（生产技术部经理）
+            case 3 -> "APPROVE_LEVEL3"; // 会签（注塑部经理）
             default -> null;
         };
     }
@@ -737,12 +844,13 @@ public class ProcessFileServiceImpl implements ProcessFileService {
     
     /**
      * 获取下一个状态
+     * 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3) → 已批准(5)
      */
     private int getNextStatus(int currentStatus) {
         return switch (currentStatus) {
-            case 1 -> 2; // 车间主任审核通过 → 待注塑部经理会签
-            case 2 -> 3; // 注塑部经理会签通过 → 待生产技术部经理批准
-            case 3 -> 5; // 生产技术部经理批准通过 → 已批准（生效中）
+            case 1 -> 2; // 车间主任审核通过 → 待生产技术部经理批准
+            case 2 -> 3; // 生产技术部经理批准通过 → 待注塑部经理会签
+            case 3 -> 5; // 注塑部经理会签通过 → 已批准（生效中）
             default -> throw new RuntimeException("状态流转异常");
         };
     }
@@ -762,22 +870,23 @@ public class ProcessFileServiceImpl implements ProcessFileService {
                 System.out.println("getStatusByRole - 匹配到车间主任角色，返回状态1");
                 return 1; // 车间主任审核
             }
-            if (userRoleCodes.contains(com.zssystem.constant.ProcessFileRoleConstant.ROLE_CODE_INJECTION_MANAGER)) {
-                System.out.println("getStatusByRole - 匹配到注塑部经理角色，返回状态2");
-                return 2; // 注塑部经理会签
-            }
             if (userRoleCodes.contains(com.zssystem.constant.ProcessFileRoleConstant.ROLE_CODE_PRODUCTION_TECH_MANAGER)) {
-                System.out.println("getStatusByRole - 匹配到生产技术部经理角色，返回状态3");
-                return 3; // 生产技术部经理批准
+                System.out.println("getStatusByRole - 匹配到生产技术部经理角色，返回状态2");
+                return 2; // 生产技术部经理批准
+            }
+            if (userRoleCodes.contains(com.zssystem.constant.ProcessFileRoleConstant.ROLE_CODE_INJECTION_MANAGER)) {
+                System.out.println("getStatusByRole - 匹配到注塑部经理角色，返回状态3");
+                return 3; // 注塑部经理会签
             }
         }
         
         // 兼容旧代码：通过角色名称判断
+        // 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3)
         if (userRole != null) {
             Integer status = switch (userRole) {
                 case "车间主任" -> 1;
-                case "注塑部经理" -> 2;
-                case "生产技术部经理" -> 3;
+                case "生产技术部经理" -> 2;
+                case "注塑部经理" -> 3;
                 default -> null;
             };
             if (status != null) {

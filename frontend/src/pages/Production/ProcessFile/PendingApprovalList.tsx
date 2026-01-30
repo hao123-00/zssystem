@@ -52,11 +52,12 @@ const PendingApprovalList: React.FC = () => {
     }
   };
 
+  // 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3)
   const getStatusTag = (status: number) => {
     const statusConfig: { [key: number]: { color: string; text: string } } = {
       1: { color: 'processing', text: '待车间主任审核' },
-      2: { color: 'processing', text: '待注塑部经理会签' },
-      3: { color: 'processing', text: '待生产技术部经理批准' },
+      2: { color: 'processing', text: '待生产技术部经理批准' },
+      3: { color: 'processing', text: '待注塑部经理会签' },
     };
     const config = statusConfig[status] || { color: 'default', text: '未知' };
     return <Tag color={config.color}>{config.text}</Tag>;

@@ -3,6 +3,7 @@ import { Modal, Form, Input, Select, message } from 'antd';
 import { RoleInfo, RoleSaveParams, createRole, updateRole, getRoleById } from '@/api/role';
 import { getPermissionTree, PermissionTreeVO } from '@/api/permission';
 import PermissionTree from '@/components/PermissionTree/PermissionTree';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface RoleModalProps {
   visible: boolean;
@@ -16,6 +17,7 @@ const RoleModal: React.FC<RoleModalProps> = ({ visible, role, onCancel, onSucces
   const [loading, setLoading] = useState(false);
   const [permissionTree, setPermissionTree] = useState<PermissionTreeVO[]>([]);
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -93,7 +95,7 @@ const RoleModal: React.FC<RoleModalProps> = ({ visible, role, onCancel, onSucces
       onOk={handleSubmit}
       onCancel={onCancel}
       confirmLoading={loading}
-      width={700}
+      width={isMobile ? '100%' : 700}
       destroyOnClose
     >
       <Form

@@ -26,8 +26,10 @@ CREATE TABLE IF NOT EXISTS `process_file_detail` (
   `cavity_quantity` int DEFAULT NULL COMMENT '型腔数量',
   `clamping_force` decimal(10,2) DEFAULT NULL COMMENT '锁模力(Mpa)',
   
-  -- 产品关键尺寸
-  `product_key_dimensions` text COMMENT '产品关键尺寸（文本）',
+  -- 产品关键尺寸（两张图片）
+  `product_key_dimensions` text COMMENT '产品关键尺寸（文本，已废弃）',
+  `product_key_dimension_image1` varchar(500) DEFAULT NULL COMMENT '产品关键尺寸图片1路径',
+  `product_key_dimension_image2` varchar(500) DEFAULT NULL COMMENT '产品关键尺寸图片2路径',
   
   -- 设备信息
   `equipment_id` bigint DEFAULT NULL COMMENT '设备ID',

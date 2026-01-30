@@ -142,9 +142,15 @@ export const uploadProcessFile = (params: ProcessFileUploadParams) => {
 };
 
 /**
- * 保存工艺文件表单
+ * 保存工艺文件表单（支持图片上传）
  */
 export const saveProcessFileForm = (params: any) => {
+  // 判断是否为 FormData
+  if (params instanceof FormData) {
+    return request.post('/production/process-file/save-form', params, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  }
   return request.post('/production/process-file/save-form', params);
 };
 
@@ -235,10 +241,20 @@ export const getPendingApprovalFiles = (pageNum: number, pageSize: number) => {
 };
 
 /**
- * 删除工艺文件
+ * 删除工艺文件（作废）
  */
 export const deleteProcessFile = (id: number) => {
   return request.delete(`/production/process-file/${id}`);
+};
+
+/**
+ * 按机台号（设备）批量删除工艺文件（作废该设备下所有工艺文件）
+ * @returns 作废的数量
+ */
+export const batchDeleteProcessFileByEquipment = (equipmentId: number) => {
+  return request.post<number>('/production/process-file/batch-delete-by-equipment', null, {
+    params: { equipmentId },
+  });
 };
 
 /**

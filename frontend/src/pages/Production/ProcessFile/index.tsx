@@ -10,6 +10,7 @@ import {
   Modal,
   message,
   Card,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
@@ -19,6 +20,7 @@ import {
   EyeOutlined,
   DeleteOutlined,
   CheckCircleOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { ProcessFileInfo, ProcessFileQueryParams } from '@/api/processFile';
@@ -26,10 +28,13 @@ import {
   getProcessFileList,
   submitProcessFile,
   deleteProcessFile,
+  batchDeleteProcessFileByEquipment,
   downloadProcessFile,
   uploadSignature,
 } from '@/api/processFile';
+import { getEquipmentList } from '@/api/equipment';
 import SignaturePad from '@/components/SignaturePad/SignaturePad';
+import ExcelPreview from '@/components/ExcelPreview/ExcelPreview';
 
 /**
  * 工艺文件列表页
@@ -46,12 +51,20 @@ const ProcessFileList: React.FC = () => {
   });
   const [submitModalVisible, setSubmitModalVisible] = useState(false);
   const [submittingFileId, setSubmittingFileId] = useState<number | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileName, setPreviewFileName] = useState<string>('');
+  const [batchDeleteVisible, setBatchDeleteVisible] = useState(false);
+  const [batchDeleteEquipmentId, setBatchDeleteEquipmentId] = useState<number | undefined>();
+  const [equipmentList, setEquipmentList] = useState<{ id: number; machineNo?: string; equipmentNo: string; equipmentName?: string }[]>([]);
+  const [batchDeleting, setBatchDeleting] = useState(false);
 
+  // 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3)
   const statusOptions = [
     { label: '草稿', value: 0 },
     { label: '待车间主任审核', value: 1 },
-    { label: '待注塑部经理会签', value: 2 },
-    { label: '待生产技术部经理批准', value: 3 },
+    { label: '待生产技术部经理批准', value: 2 },
+    { label: '待注塑部经理会签', value: 3 },
     { label: '已批准（生效中）', value: 5 },
     { label: '已驳回', value: -1 },
     { label: '已作废', value: -2 },
@@ -129,7 +142,7 @@ const ProcessFileList: React.FC = () => {
   const handleDelete = async (id: number) => {
     Modal.confirm({
       title: '确认删除',
-      content: '确定要删除此工艺文件吗？',
+      content: '确定要删除此工艺文件吗？删除后状态为已作废。',
       onOk: async () => {
         try {
           await deleteProcessFile(id);
@@ -140,6 +153,35 @@ const ProcessFileList: React.FC = () => {
         }
       },
     });
+  };
+
+  const openBatchDelete = () => {
+    setBatchDeleteVisible(true);
+    setBatchDeleteEquipmentId(undefined);
+    getEquipmentList({ pageNum: 1, pageSize: 500 }).then((res: any) => {
+      const list = res?.list ?? res?.data?.list ?? [];
+      setEquipmentList(Array.isArray(list) ? list : []);
+    }).catch(() => message.error('加载设备列表失败'));
+  };
+
+  const handleBatchDeleteOk = async () => {
+    if (batchDeleteEquipmentId == null) {
+      message.warning('请选择机台号');
+      return;
+    }
+    setBatchDeleting(true);
+    try {
+      const res: any = await batchDeleteProcessFileByEquipment(batchDeleteEquipmentId);
+      const count = typeof res === 'number' ? res : (res?.data ?? res?.count ?? 0);
+      message.success(`已删除该机台下 ${count} 个工艺文件`);
+      setBatchDeleteVisible(false);
+      setBatchDeleteEquipmentId(undefined);
+      fetchList();
+    } catch (error: any) {
+      message.error(error.message || '批量删除失败');
+    } finally {
+      setBatchDeleting(false);
+    }
   };
 
   const handleDownload = async (record: ProcessFileInfo) => {
@@ -190,6 +232,37 @@ const ProcessFileList: React.FC = () => {
       console.error('下载工艺文件失败:', error);
       const errorMessage = error.message || '未知错误';
       message.error('下载失败: ' + errorMessage);
+    }
+  };
+
+  const handlePreview = async (record: ProcessFileInfo) => {
+    try {
+      console.log('开始预览工艺文件，ID:', record.id);
+      const response = await downloadProcessFile(record.id);
+      
+      // 检查响应状态
+      if (!response || !response.data) {
+        throw new Error('获取文件失败');
+      }
+      
+      // 检查是否是错误响应
+      if (response.data instanceof Blob) {
+        if (response.data.type === 'text/plain' || response.data.type === 'application/json' || response.data.size < 100) {
+          const text = await response.data.text();
+          throw new Error(text || '获取文件失败');
+        }
+      }
+      
+      const blob = response.data instanceof Blob 
+        ? response.data 
+        : new Blob([response.data]);
+      
+      setPreviewBlob(blob);
+      setPreviewFileName(record.fileName || `工艺文件_${record.id}.xlsx`);
+      setPreviewVisible(true);
+    } catch (error: any) {
+      console.error('预览工艺文件失败:', error);
+      message.error('预览失败: ' + (error.message || '未知错误'));
     }
   };
 
@@ -269,16 +342,26 @@ const ProcessFileList: React.FC = () => {
       title: '操作',
       key: 'action',
       fixed: 'right' as const,
-      width: 220,
+      width: 280,
       render: (_: any, record: ProcessFileInfo) => (
         <Space size="small">
+          <Tooltip title="预览Excel内容">
+            <Button
+              type="link"
+              size="small"
+              icon={<FileExcelOutlined />}
+              onClick={() => handlePreview(record)}
+            >
+              预览
+            </Button>
+          </Tooltip>
           <Button
             type="link"
             size="small"
             icon={<EyeOutlined />}
             onClick={() => navigate(`/production/process-file/detail/${record.id}`)}
           >
-            查看
+            详情
           </Button>
           <Button
             type="link"
@@ -289,25 +372,25 @@ const ProcessFileList: React.FC = () => {
             下载
           </Button>
           {record.status === 0 && (
-            <>
-              <Button
-                type="link"
-                size="small"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleSubmit(record.id)}
-              >
-                提交
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDelete(record.id)}
-              >
-                删除
-              </Button>
-            </>
+            <Button
+              type="link"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleSubmit(record.id)}
+            >
+              提交
+            </Button>
+          )}
+          {(record.status === 0 || record.status === -2) && (
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.id)}
+            >
+              删除
+            </Button>
           )}
         </Space>
       ),
@@ -355,13 +438,22 @@ const ProcessFileList: React.FC = () => {
         </Form>
 
         <div style={{ marginBottom: 16 }}>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/production/process-file/form')}
-          >
-            新建工艺文件
-          </Button>
+          <Space>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/production/process-file/form')}
+            >
+              新建工艺文件
+            </Button>
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={openBatchDelete}
+            >
+              按机台号批量删除
+            </Button>
+          </Space>
         </div>
 
         <Table
@@ -377,9 +469,40 @@ const ProcessFileList: React.FC = () => {
               total: pagination.total,
             });
           }}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1500 }}
         />
       </Card>
+
+      {/* 按机台号批量删除弹窗 */}
+      <Modal
+        title="按机台号批量删除工艺文件"
+        open={batchDeleteVisible}
+        onCancel={() => {
+          setBatchDeleteVisible(false);
+          setBatchDeleteEquipmentId(undefined);
+        }}
+        onOk={handleBatchDeleteOk}
+        confirmLoading={batchDeleting}
+        okText="确定删除"
+        okButtonProps={{ danger: true }}
+      >
+        <p style={{ marginBottom: 12 }}>选择机台（设备）后，将把该机台下所有工艺文件作废删除。</p>
+        <Form.Item label="选择机台号" required>
+          <Select
+            placeholder="请选择机台号"
+            allowClear
+            style={{ width: '100%' }}
+            value={batchDeleteEquipmentId}
+            onChange={setBatchDeleteEquipmentId}
+            showSearch
+            optionFilterProp="label"
+            options={equipmentList.map((eq) => ({
+              value: eq.id,
+              label: eq.machineNo ? `${eq.machineNo} - ${eq.equipmentName ?? eq.equipmentNo}` : `${eq.equipmentNo} - ${eq.equipmentName ?? ''}`,
+            }))}
+          />
+        </Form.Item>
+      </Modal>
 
       {/* 提交审批签名弹窗 */}
       <Modal
@@ -401,6 +524,18 @@ const ProcessFileList: React.FC = () => {
           }}
         />
       </Modal>
+
+      {/* Excel 预览弹窗 */}
+      <ExcelPreview
+        visible={previewVisible}
+        onClose={() => {
+          setPreviewVisible(false);
+          setPreviewBlob(null);
+          setPreviewFileName('');
+        }}
+        fileBlob={previewBlob}
+        fileName={previewFileName}
+      />
     </div>
   );
 };

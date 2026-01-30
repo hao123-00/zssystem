@@ -34,6 +34,14 @@ public interface ProcessFileService {
     Long saveProcessFileForm(com.zssystem.dto.ProcessFileFormDTO formDTO, Long currentUserId, String currentUserName);
     
     /**
+     * 保存工艺文件表单（支持产品关键尺寸图片上传）
+     * @return 工艺文件ID
+     */
+    Long saveProcessFileForm(com.zssystem.dto.ProcessFileFormDTO formDTO, Long currentUserId, String currentUserName,
+                             org.springframework.web.multipart.MultipartFile keyDimensionImage1,
+                             org.springframework.web.multipart.MultipartFile keyDimensionImage2);
+    
+    /**
      * 提交审批
      */
     void submitForApproval(Long fileId, Long currentUserId);
@@ -44,9 +52,15 @@ public interface ProcessFileService {
     void approveProcessFile(ProcessFileApprovalDTO approvalDTO, Long currentUserId, String currentUserName, String currentUserRole, Long signatureId);
     
     /**
-     * 作废工艺文件
+     * 作废工艺文件（删除）
      */
     void invalidateProcessFile(Long fileId, Long currentUserId);
+    
+    /**
+     * 按设备（机台号）批量作废工艺文件
+     * @return 作废的数量
+     */
+    int batchInvalidateByEquipmentId(Long equipmentId, Long currentUserId);
     
     /**
      * 下载工艺文件

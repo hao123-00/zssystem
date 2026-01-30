@@ -22,6 +22,7 @@ import {
   CloseCircleOutlined,
   HistoryOutlined,
   ArrowLeftOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -32,6 +33,7 @@ import {
 } from '@/api/processFile';
 import type { ProcessFileInfo } from '@/api/processFile';
 import SignaturePad from '@/components/SignaturePad/SignaturePad';
+import ExcelPreview from '@/components/ExcelPreview/ExcelPreview';
 
 /**
  * 工艺文件详情页
@@ -46,6 +48,9 @@ const ProcessFileDetail: React.FC = () => {
   const [approvalLoading, setApprovalLoading] = useState(false);
   const [signatureModalVisible, setSignatureModalVisible] = useState(false);
   const [pendingSignature, setPendingSignature] = useState<string | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -130,6 +135,41 @@ const ProcessFileDetail: React.FC = () => {
     }
   };
 
+  const handlePreview = async () => {
+    if (!fileDetail) return;
+    
+    setPreviewLoading(true);
+    try {
+      console.log('开始预览工艺文件，ID:', fileDetail.id);
+      const response = await downloadProcessFile(fileDetail.id);
+      
+      // 检查响应状态
+      if (!response || !response.data) {
+        throw new Error('获取文件失败');
+      }
+      
+      // 检查是否是错误响应
+      if (response.data instanceof Blob) {
+        if (response.data.type === 'text/plain' || response.data.type === 'application/json' || response.data.size < 100) {
+          const text = await response.data.text();
+          throw new Error(text || '获取文件失败');
+        }
+      }
+      
+      const blob = response.data instanceof Blob 
+        ? response.data 
+        : new Blob([response.data]);
+      
+      setPreviewBlob(blob);
+      setPreviewVisible(true);
+    } catch (error: any) {
+      console.error('预览工艺文件失败:', error);
+      message.error('预览失败: ' + (error.message || '未知错误'));
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const handleApprove = async () => {
     try {
       const values = await form.validateFields();
@@ -179,12 +219,13 @@ const ProcessFileDetail: React.FC = () => {
     }
   };
 
+  // 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3)
   const getStatusTag = (status: number) => {
     const statusConfig: { [key: number]: { color: string; text: string } } = {
       0: { color: 'default', text: '草稿' },
       1: { color: 'processing', text: '待车间主任审核' },
-      2: { color: 'processing', text: '待注塑部经理会签' },
-      3: { color: 'processing', text: '待生产技术部经理批准' },
+      2: { color: 'processing', text: '待生产技术部经理批准' },
+      3: { color: 'processing', text: '待注塑部经理会签' },
       5: { color: 'success', text: '已批准（生效中）' },
       '-1': { color: 'error', text: '已驳回' },
       '-2': { color: 'default', text: '已作废' },
@@ -222,6 +263,13 @@ const ProcessFileDetail: React.FC = () => {
         title="工艺文件详情"
         extra={
           <Space>
+            <Button 
+              icon={<EyeOutlined />} 
+              onClick={handlePreview}
+              loading={previewLoading}
+            >
+              预览Excel
+            </Button>
             <Button icon={<DownloadOutlined />} onClick={handleDownload}>
               下载文件
             </Button>
@@ -451,6 +499,17 @@ const ProcessFileDetail: React.FC = () => {
             }}
           />
         </Modal>
+
+        {/* Excel 预览弹窗 */}
+        <ExcelPreview
+          visible={previewVisible}
+          onClose={() => {
+            setPreviewVisible(false);
+            setPreviewBlob(null);
+          }}
+          fileBlob={previewBlob}
+          fileName={fileDetail?.fileName}
+        />
       </div>
     );
   };

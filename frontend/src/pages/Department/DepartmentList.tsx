@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Tree, Button, Space, message, Popconfirm, Modal, Form, Input, Select, InputNumber } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Tree, Button, Space, message, Popconfirm, Modal, Form, Input, Select, InputNumber, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, MoreOutlined } from '@ant-design/icons';
 import {
   getDepartmentTree,
   createDepartment,
@@ -9,6 +9,7 @@ import {
   DepartmentTreeVO,
   DepartmentSaveParams,
 } from '@/api/department';
+import { useResponsive } from '@/hooks/useResponsive';
 import './DepartmentList.less';
 
 const DepartmentList: React.FC = () => {
@@ -19,6 +20,7 @@ const DepartmentList: React.FC = () => {
   const [editingDepartment, setEditingDepartment] = useState<DepartmentTreeVO | null>(null);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const { isMobile } = useResponsive();
 
   const fetchTree = async () => {
     setLoading(true);
@@ -113,51 +115,90 @@ const DepartmentList: React.FC = () => {
     return nodes.map((node) => ({
       key: node.id,
       title: (
-        <div className="tree-node-title">
-          <span>{node.deptName}</span>
+        <div className={`tree-node-title ${isMobile ? 'tree-node-title-mobile' : ''}`}>
+          <span className="tree-node-name">{node.deptName}</span>
           {node.deptCode && <span className="tree-node-code">({node.deptCode})</span>}
-          <Space className="tree-node-actions">
-            <Button
-              type="link"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAdd(node.id);
+          {isMobile ? (
+            // 移动端使用下拉菜单
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'add',
+                    label: '添加子部门',
+                    icon: <PlusOutlined />,
+                    onClick: () => handleAdd(node.id),
+                  },
+                  {
+                    key: 'edit',
+                    label: '编辑',
+                    icon: <EditOutlined />,
+                    onClick: () => handleEdit(node),
+                  },
+                  {
+                    key: 'delete',
+                    label: '删除',
+                    icon: <DeleteOutlined />,
+                    danger: true,
+                    onClick: () => handleDelete(node.id),
+                  },
+                ],
               }}
+              trigger={['click']}
             >
-              添加子部门
-            </Button>
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEdit(node);
-              }}
-            >
-              编辑
-            </Button>
-            <Popconfirm
-              title="确定要删除这个部门吗？"
-              onConfirm={(e) => {
-                e?.stopPropagation();
-                handleDelete(node.id);
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
+              <Button
+                type="text"
+                size="small"
+                icon={<MoreOutlined />}
+                onClick={(e) => e.stopPropagation()}
+                className="tree-node-more"
+              />
+            </Dropdown>
+          ) : (
+            // PC 端显示完整按钮
+            <Space className="tree-node-actions">
               <Button
                 type="link"
                 size="small"
-                danger
-                icon={<DeleteOutlined />}
+                icon={<PlusOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAdd(node.id);
+                }}
+              >
+                添加子部门
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEdit(node);
+                }}
+              >
+                编辑
+              </Button>
+              <Popconfirm
+                title="确定要删除这个部门吗？"
+                onConfirm={(e) => {
+                  e?.stopPropagation();
+                  handleDelete(node.id);
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
-                删除
-              </Button>
-            </Popconfirm>
-          </Space>
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  删除
+                </Button>
+              </Popconfirm>
+            </Space>
+          )}
         </div>
       ),
       children: node.children && node.children.length > 0 ? convertToTreeData(node.children) : undefined,
@@ -165,11 +206,11 @@ const DepartmentList: React.FC = () => {
   };
 
   return (
-    <div className="department-list-container">
+    <div className={`department-list-container ${isMobile ? 'department-list-mobile' : ''}`}>
       <div className="toolbar">
         <Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => handleAdd()}>
-            添加根部门
+            {isMobile ? '添加' : '添加根部门'}
           </Button>
           <Button icon={<ReloadOutlined />} onClick={fetchTree}>
             刷新
@@ -194,7 +235,7 @@ const DepartmentList: React.FC = () => {
         open={modalVisible}
         onOk={handleSubmit}
         onCancel={() => setModalVisible(false)}
-        width={600}
+        width={isMobile ? '100%' : 600}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="id" hidden>

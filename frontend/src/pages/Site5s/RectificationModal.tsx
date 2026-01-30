@@ -6,6 +6,7 @@ import {
   saveSite5sRectification,
 } from '@/api/site5s';
 import dayjs from 'dayjs';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface RectificationModalProps {
   visible: boolean;
@@ -21,6 +22,7 @@ const RectificationModal: React.FC<RectificationModalProps> = ({
   onSuccess,
 }) => {
   const [form] = Form.useForm();
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -74,7 +76,7 @@ const RectificationModal: React.FC<RectificationModalProps> = ({
       open={visible}
       onOk={handleSubmit}
       onCancel={onCancel}
-      width={800}
+      width={isMobile ? '100%' : 800}
       destroyOnClose
     >
       <Form form={form} layout="vertical">

@@ -16,7 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 public class EquipmentCheckServiceImpl implements EquipmentCheckService {
@@ -128,5 +130,23 @@ public class EquipmentCheckServiceImpl implements EquipmentCheckService {
             throw new RuntimeException("点检记录不存在");
         }
         checkMapper.deleteById(id);
+    }
+
+    @Override
+    public byte[] exportCheckExcel(Long equipmentId, String checkMonth) throws IOException {
+        if (equipmentId == null || checkMonth == null || checkMonth.isBlank()) {
+            throw new RuntimeException("请选择设备和月份");
+        }
+        Equipment equipment = equipmentMapper.selectById(equipmentId);
+        if (equipment == null) {
+            throw new RuntimeException("设备不存在");
+        }
+        List<EquipmentCheck> records = checkMapper.selectList(
+            new LambdaQueryWrapper<EquipmentCheck>()
+                .eq(EquipmentCheck::getEquipmentId, equipmentId)
+                .eq(EquipmentCheck::getCheckMonth, checkMonth)
+                .orderByAsc(EquipmentCheck::getCheckDate)
+        );
+        return com.zssystem.util.EquipmentCheckExcelGenerator.generate(equipment, checkMonth, records);
     }
 }

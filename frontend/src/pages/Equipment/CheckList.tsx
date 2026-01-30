@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag, DatePicker } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag, DatePicker, Modal } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
 import {
   getCheckList,
   deleteCheck,
+  exportCheckExcel,
   EquipmentCheckInfo,
   EquipmentCheckQueryParams,
 } from '@/api/equipment';
 import CheckModal from './CheckModal';
 import { getEquipmentList } from '@/api/equipment';
-import dayjs from 'dayjs';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './CheckList.less';
 
 const CheckList: React.FC = () => {
@@ -24,6 +27,11 @@ const CheckList: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCheck, setEditingCheck] = useState<EquipmentCheckInfo | null>(null);
   const [equipmentList, setEquipmentList] = useState<any[]>([]);
+  const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [exportEquipmentId, setExportEquipmentId] = useState<number | undefined>();
+  const [exportMonth, setExportMonth] = useState<any>(null);
+  const [exporting, setExporting] = useState(false);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     loadEquipmentList();
@@ -92,6 +100,41 @@ const CheckList: React.FC = () => {
 
   const handleTableChange = (page: number, pageSize: number) => {
     setPagination({ ...pagination, current: page, pageSize });
+  };
+
+  const handleExportOpen = () => {
+    setExportModalVisible(true);
+    setExportEquipmentId(undefined);
+    setExportMonth(null);
+  };
+
+  const handleExportOk = async () => {
+    if (exportEquipmentId == null) {
+      message.warning('请选择设备');
+      return;
+    }
+    if (!exportMonth) {
+      message.warning('请选择月份');
+      return;
+    }
+    const checkMonth = exportMonth.format('YYYY-MM');
+    setExporting(true);
+    try {
+      const res = await exportCheckExcel(exportEquipmentId, checkMonth);
+      const blob = res instanceof Blob ? res : (res?.data instanceof Blob ? res.data : new Blob([res?.data ?? []]));
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `点检表_${checkMonth}.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      message.success('导出成功');
+      setExportModalVisible(false);
+    } catch (error: any) {
+      message.error(error.message || '导出失败');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const renderCheckItem = (value: number | undefined) => {
@@ -272,65 +315,125 @@ const CheckList: React.FC = () => {
     },
   ];
 
+  // 计算异常项数量
+  const countAbnormalItems = (record: EquipmentCheckInfo): number => {
+    const checkItems = [
+      record.circuitItem1, record.circuitItem2, record.circuitItem3,
+      record.frameItem1, record.frameItem2, record.frameItem3,
+      record.oilItem1, record.oilItem2, record.oilItem3, record.oilItem4, record.oilItem5,
+      record.peripheralItem1, record.peripheralItem2, record.peripheralItem3, record.peripheralItem4, record.peripheralItem5,
+    ];
+    return checkItems.filter(item => item === 0).length;
+  };
+
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'equipmentNo', label: '设备编号' },
+    { key: 'checkerName', label: '检点人' },
+    {
+      key: 'abnormalCount',
+      label: '异常项',
+      render: (_: any, record: EquipmentCheckInfo) => {
+        const count = countAbnormalItems(record);
+        return count > 0 ? (
+          <Tag color="error">{count} 项异常</Tag>
+        ) : (
+          <Tag color="success">全部正常</Tag>
+        );
+      },
+    },
+    { key: 'remark', label: '备注' },
+  ];
+
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id),
+    },
+  ];
+
   return (
-    <div className="check-list-container">
-      <div className="search-form">
-        <Form form={form} layout="inline">
-          <Form.Item name="equipmentNo">
-            <Select
-              placeholder="设备编号"
-              allowClear
-              showSearch
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={equipmentList.map((eq) => ({
-                value: eq.equipmentNo,
-                label: `${eq.equipmentNo} - ${eq.equipmentName}`,
-              }))}
-              style={{ width: 200 }}
-            />
-          </Form.Item>
-          <Form.Item name="checkMonth">
-            <DatePicker picker="month" placeholder="检查月份" format="YYYY-MM" />
-          </Form.Item>
-          <Form.Item name="checkerName">
-            <Input placeholder="检点人" allowClear />
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={handleSearch}>
-                查询
-              </Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+    <div className={`check-list-container ${isMobile ? 'check-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              {isMobile ? '新增' : '新增点检'}
+            </Button>
+            <Button icon={<DownloadOutlined />} onClick={handleExportOpen}>
+              {isMobile ? '导出' : '导出30天点检表'}
+            </Button>
+          </Space>
+        }
+      >
+        <Form.Item name="equipmentNo" label={isMobile ? '设备' : undefined}>
+          <Select
+            placeholder="设备编号"
+            allowClear
+            showSearch
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={equipmentList.map((eq) => ({
+              value: eq.equipmentNo,
+              label: `${eq.equipmentNo} - ${eq.equipmentName}`,
+            }))}
+            style={{ width: isMobile ? '100%' : 200 }}
+          />
+        </Form.Item>
+        <Form.Item name="checkMonth" label={isMobile ? '月份' : undefined}>
+          <DatePicker picker="month" placeholder="检查月份" format="YYYY-MM" style={{ width: isMobile ? '100%' : undefined }} />
+        </Form.Item>
+        <Form.Item name="checkerName" label={isMobile ? '检点人' : undefined}>
+          <Input placeholder="检点人" allowClear />
+        </Form.Item>
+      </ResponsiveSearch>
 
-      <div className="toolbar">
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增点检
-        </Button>
-        <Button icon={<ReloadOutlined />} onClick={fetchList}>
-          刷新
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: 2000 }}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-        }}
-      />
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'checkDate', label: '检查日期' }}
+          subtitleField={{ key: 'equipmentName', label: '设备名称' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange,
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 2000 }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: handleTableChange,
+          }}
+        />
+      )}
 
       <CheckModal
         visible={modalVisible}
@@ -341,6 +444,42 @@ const CheckList: React.FC = () => {
           fetchList();
         }}
       />
+
+      <Modal
+        title="导出30天点检表"
+        open={exportModalVisible}
+        onCancel={() => setExportModalVisible(false)}
+        onOk={handleExportOk}
+        confirmLoading={exporting}
+        okText="导出"
+      >
+        <Form layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item label="选择设备" required>
+            <Select
+              placeholder="请选择设备"
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              value={exportEquipmentId}
+              onChange={setExportEquipmentId}
+              options={equipmentList.map((eq) => ({
+                value: eq.id,
+                label: `${eq.equipmentNo} - ${eq.equipmentName}`,
+              }))}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          <Form.Item label="选择月份" required>
+            <DatePicker
+              picker="month"
+              format="YYYY-MM"
+              value={exportMonth}
+              onChange={setExportMonth}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

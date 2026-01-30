@@ -11,6 +11,11 @@ import java.math.BigDecimal;
 public class ProcessFileFormDTO {
     private Long id; // 修改时传入
     
+    /** 工艺文件编号（新建时必填，手动输入） */
+    private String fileNo;
+    /** 文件名称（新建时必填，手动输入） */
+    private String fileName;
+    
     @NotNull(message = "设备ID不能为空")
     private Long equipmentId;
     
@@ -39,8 +44,11 @@ public class ProcessFileFormDTO {
     private Integer cavityQuantity;
     private BigDecimal clampingForce;
     
-    // 产品关键尺寸
+    // 产品关键尺寸（旧字段，已废弃）
     private String productKeyDimensions;
+    // 产品关键尺寸图片路径（新字段，由后端填充）
+    private String productKeyDimensionImage1;
+    private String productKeyDimensionImage2;
     
     // 注塑成型工艺参数 - 合模
     private BigDecimal clamp1Pressure;

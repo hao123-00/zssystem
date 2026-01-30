@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, DatePicker, Select, message } from 'antd';
+import { Modal, Form, Input, DatePicker, Select, message } from 'antd';
 import dayjs from 'dayjs';
 import {
   EquipmentInfo,
@@ -8,6 +8,7 @@ import {
   updateEquipment,
   getEquipmentById,
 } from '@/api/equipment';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface EquipmentModalProps {
   visible: boolean;
@@ -24,6 +25,7 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -119,7 +121,7 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
       onOk={handleSubmit}
       onCancel={onCancel}
       confirmLoading={loading}
-      width={800}
+      width={isMobile ? '100%' : 800}
       destroyOnClose
     >
       <Form

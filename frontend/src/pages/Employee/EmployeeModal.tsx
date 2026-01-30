@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, DatePicker, InputNumber, message } from 'antd';
-import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import { EmployeeInfo, EmployeeSaveParams, createEmployee, updateEmployee, getEmployeeById } from '@/api/employee';
 import { DepartmentTreeVO } from '@/api/department';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface EmployeeModalProps {
   visible: boolean;
@@ -22,6 +22,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -105,7 +106,7 @@ const EmployeeModal: React.FC<EmployeeModalProps> = ({
       onOk={handleSubmit}
       onCancel={onCancel}
       confirmLoading={loading}
-      width={700}
+      width={isMobile ? '100%' : 700}
       destroyOnClose
     >
       <Form

@@ -3,11 +3,13 @@
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  padding: 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .login-box {
   width: 400px;
+  max-width: 100%;
   padding: 40px;
   background: #fff;
   border-radius: 8px;
@@ -20,4 +22,46 @@
   color: #333;
   font-size: 24px;
   font-weight: 500;
+}
+
+// ============================================
+// 移动端适配
+// ============================================
+@media (max-width: 768px) {
+  .login-container {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 60px;
+  }
+
+  .login-box {
+    width: 100%;
+    padding: 24px 20px;
+    border-radius: 12px;
+  }
+
+  .login-title {
+    font-size: 20px;
+    margin-bottom: 24px;
+  }
+
+  // 优化输入框大小
+  .ant-input-affix-wrapper {
+    padding: 12px 11px;
+
+    .ant-input {
+      font-size: 16px; // 防止 iOS 自动缩放
+    }
+  }
+
+  // 优化按钮大小
+  .ant-btn-lg {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  // 记住我复选框
+  .ant-checkbox-wrapper {
+    font-size: 14px;
+  }
 }

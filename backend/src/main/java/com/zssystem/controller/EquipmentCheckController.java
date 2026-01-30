@@ -9,8 +9,14 @@ import com.zssystem.service.EquipmentCheckService;
 import com.zssystem.vo.EquipmentCheckVO;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/equipment/check")
@@ -42,5 +48,26 @@ public class EquipmentCheckController {
     public Result<Void> deleteCheck(@PathVariable Long id) {
         checkService.deleteCheck(id);
         return Result.success();
+    }
+
+    /**
+     * 导出某设备某月30天点检记录为 Excel
+     */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportCheckExcel(
+            @RequestParam Long equipmentId,
+            @RequestParam String checkMonth) {
+        try {
+            byte[] bytes = checkService.exportCheckExcel(equipmentId, checkMonth);
+            String fileName = "点检表_" + checkMonth + ".xlsx";
+            String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.setContentDispositionFormData("attachment", encoded);
+            headers.setContentLength(bytes.length);
+            return ResponseEntity.ok().headers(headers).body(bytes);
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "导出失败", e);
+        }
     }
 }

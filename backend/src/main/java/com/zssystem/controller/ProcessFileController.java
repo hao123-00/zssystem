@@ -77,10 +77,13 @@ public class ProcessFileController {
     }
     
     /**
-     * 保存工艺文件表单（新建或修改）- 表单方式
+     * 保存工艺文件表单（新建或修改）- 表单方式（支持图片上传）
      */
-    @PostMapping("/save-form")
-    public Result<Long> saveForm(@Validated @RequestBody com.zssystem.dto.ProcessFileFormDTO formDTO) {
+    @PostMapping(value = "/save-form", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    public Result<Long> saveForm(
+            @Validated @ModelAttribute com.zssystem.dto.ProcessFileFormDTO formDTO,
+            @RequestParam(value = "keyDimensionImage1", required = false) MultipartFile keyDimensionImage1,
+            @RequestParam(value = "keyDimensionImage2", required = false) MultipartFile keyDimensionImage2) {
         try {
             Long currentUserId = SecurityUtil.getCurrentUserId();
             String currentUserName = SecurityUtil.getCurrentUsername();
@@ -89,7 +92,8 @@ public class ProcessFileController {
                 return Result.error("用户未登录");
             }
             
-            Long fileId = processFileService.saveProcessFileForm(formDTO, currentUserId, currentUserName);
+            Long fileId = processFileService.saveProcessFileForm(formDTO, currentUserId, currentUserName, 
+                    keyDimensionImage1, keyDimensionImage2);
             
             return Result.success(fileId);
         } catch (Exception e) {
@@ -218,12 +222,13 @@ public class ProcessFileController {
     
     /**
      * 根据状态获取签名类型
+     * 审批流程：车间主任审核(1) → 生产技术部经理批准(2) → 注塑部经理会签(3)
      */
     private String getSignatureTypeByStatus(Integer status) {
         return switch (status) {
-            case 1 -> "APPROVE_LEVEL1"; // 待车间主任审核
-            case 2 -> "APPROVE_LEVEL2"; // 待注塑部经理会签
-            case 3 -> "APPROVE_LEVEL3"; // 待生产技术部经理批准
+            case 1 -> "APPROVE_LEVEL1"; // 车间主任审核 → 审核人
+            case 2 -> "APPROVE_LEVEL2"; // 生产技术部经理批准 → 批准人
+            case 3 -> "APPROVE_LEVEL3"; // 注塑部经理会签 → 会签
             default -> throw new RuntimeException("无效的状态");
         };
     }
@@ -342,7 +347,7 @@ public class ProcessFileController {
     }
 
     /**
-     * 删除工艺文件
+     * 删除工艺文件（作废）
      */
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
@@ -354,6 +359,19 @@ public class ProcessFileController {
         
         processFileService.invalidateProcessFile(id, currentUserId);
         return Result.success();
+    }
+    
+    /**
+     * 按机台号（设备）批量删除工艺文件（作废该设备下所有工艺文件）
+     */
+    @PostMapping("/batch-delete-by-equipment")
+    public Result<Integer> batchDeleteByEquipment(@RequestParam Long equipmentId) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        int count = processFileService.batchInvalidateByEquipmentId(equipmentId, currentUserId);
+        return Result.success(count);
     }
     
     /**

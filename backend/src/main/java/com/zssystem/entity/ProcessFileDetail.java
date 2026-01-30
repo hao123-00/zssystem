@@ -39,8 +39,10 @@ public class ProcessFileDetail {
     private Integer cavityQuantity;
     private BigDecimal clampingForce;
     
-    // 产品关键尺寸
-    private String productKeyDimensions;
+    // 产品关键尺寸（两张图片）
+    private String productKeyDimensions;  // 已废弃，保留兼容
+    private String productKeyDimensionImage1;  // 产品关键尺寸图片1路径
+    private String productKeyDimensionImage2;  // 产品关键尺寸图片2路径
     
     // 设备信息
     private Long equipmentId;

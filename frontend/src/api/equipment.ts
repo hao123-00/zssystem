@@ -272,6 +272,16 @@ export const deleteCheck = (id: number) => {
   return request.delete<void>(`/equipment/check/${id}`);
 };
 
+/**
+ * 导出某设备某月30天点检记录为 Excel
+ */
+export const exportCheckExcel = (equipmentId: number, checkMonth: string) => {
+  return request.get(`/equipment/check/export`, {
+    params: { equipmentId, checkMonth },
+    responseType: 'blob',
+  });
+};
+
 // ========== 设备维护 API ==========
 export const getMaintenanceList = (params: EquipmentMaintenanceQueryParams) => {
   return request.get<{

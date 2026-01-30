@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Modal, Form, Input, InputNumber, DatePicker, message } from 'antd';
 import { Site5sCheckInfo, Site5sCheckSaveParams, saveSite5sCheck } from '@/api/site5s';
 import dayjs from 'dayjs';
+import { useResponsive } from '@/hooks/useResponsive';
 
 interface CheckModalProps {
   visible: boolean;
@@ -17,6 +18,7 @@ const CheckModal: React.FC<CheckModalProps> = ({
   onSuccess,
 }) => {
   const [form] = Form.useForm();
+  const { isMobile } = useResponsive();
 
   useEffect(() => {
     if (visible) {
@@ -66,7 +68,7 @@ const CheckModal: React.FC<CheckModalProps> = ({
       open={visible}
       onOk={handleSubmit}
       onCancel={onCancel}
-      width={800}
+      width={isMobile ? '100%' : 800}
       destroyOnClose
     >
       <Form

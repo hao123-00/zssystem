@@ -1,0 +1,120 @@
+.mobile-card-list {
+  padding-bottom: 16px;
+}
+
+.mobile-card-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.mobile-card-empty {
+  padding: 40px 0;
+}
+
+.mobile-card-item {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+
+  .ant-card-body {
+    padding: 12px;
+  }
+}
+
+.mobile-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.mobile-card-title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
+.mobile-card-subtitle {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 2px;
+}
+
+.mobile-card-more {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin: -4px -8px 0 8px;
+}
+
+.mobile-card-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.mobile-card-field {
+  display: flex;
+  align-items: flex-start;
+  min-width: calc(50% - 8px);
+  font-size: 13px;
+  line-height: 1.5;
+
+  // 长字段占满整行
+  &.mobile-card-field-full {
+    min-width: 100%;
+  }
+}
+
+.mobile-card-field-label {
+  flex-shrink: 0;
+  color: #8c8c8c;
+}
+
+.mobile-card-field-value {
+  color: #262626;
+  word-break: break-all;
+}
+
+.mobile-card-pagination {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+  background: #fff;
+  border-radius: 8px;
+  margin-top: 12px;
+
+  .ant-pagination {
+    .ant-pagination-total-text {
+      font-size: 12px;
+      color: #8c8c8c;
+    }
+  }
+}
+
+// 操作按钮在底部的样式（可选）
+.mobile-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+
+  .ant-btn {
+    padding: 4px 12px;
+    height: 32px;
+    font-size: 13px;
+  }
+}

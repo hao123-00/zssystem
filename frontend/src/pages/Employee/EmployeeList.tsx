@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   getEmployeeList,
   deleteEmployee,
@@ -9,6 +9,9 @@ import {
 } from '@/api/employee';
 import { getDepartmentTree, DepartmentTreeVO } from '@/api/department';
 import EmployeeModal from './EmployeeModal';
+import { useResponsive } from '@/hooks/useResponsive';
+import { ResponsiveSearch } from '@/components/ResponsiveSearch';
+import { MobileCardList, FieldConfig, ActionConfig } from '@/components/MobileCard';
 import './EmployeeList.less';
 
 const EmployeeList: React.FC = () => {
@@ -23,6 +26,7 @@ const EmployeeList: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<EmployeeInfo | null>(null);
   const [departmentTree, setDepartmentTree] = useState<DepartmentTreeVO[]>([]);
+  const { isMobile } = useResponsive();
 
   const fetchList = async () => {
     setLoading(true);
@@ -190,65 +194,104 @@ const EmployeeList: React.FC = () => {
     },
   ];
 
+  // 移动端卡片字段配置
+  const mobileFields: FieldConfig[] = [
+    { key: 'employeeNo', label: '工号' },
+    { key: 'phone', label: '手机号' },
+    { key: 'departmentName', label: '部门' },
+    { key: 'position', label: '职位' },
+    {
+      key: 'status',
+      label: '状态',
+      render: (value: number) => (
+        <Tag color={value === 1 ? 'success' : 'error'}>{value === 1 ? '在职' : '离职'}</Tag>
+      ),
+    },
+  ];
+
+  // 移动端操作按钮配置
+  const mobileActions: ActionConfig[] = [
+    {
+      key: 'edit',
+      label: '编辑',
+      icon: <EditOutlined />,
+      onClick: (record) => handleEdit(record),
+    },
+    {
+      key: 'delete',
+      label: '删除',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: (record) => handleDelete(record.id),
+    },
+  ];
+
   return (
-    <div className="employee-list-container">
-      <div className="search-form">
-        <Form form={form} layout="inline">
-          <Form.Item name="name">
-            <Input placeholder="姓名" allowClear />
-          </Form.Item>
-          <Form.Item name="employeeNo">
-            <Input placeholder="工号" allowClear />
-          </Form.Item>
-          <Form.Item name="departmentId">
-            <Select placeholder="部门" allowClear style={{ width: 200 }}>
-              {flattenDepartments(departmentTree).map((dept) => (
-                <Select.Option key={dept.id} value={dept.id}>
-                  {dept.deptName}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item name="status">
-            <Select placeholder="状态" allowClear style={{ width: 120 }}>
-              <Select.Option value={1}>在职</Select.Option>
-              <Select.Option value={0}>离职</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={handleSearch}>
-                查询
-              </Button>
-              <Button onClick={handleReset}>重置</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </div>
+    <div className={`employee-list-container ${isMobile ? 'employee-list-mobile' : ''}`}>
+      <ResponsiveSearch
+        form={form}
+        onSearch={handleSearch}
+        onReset={handleReset}
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+            {isMobile ? '新增' : '新增员工'}
+          </Button>
+        }
+      >
+        <Form.Item name="name" label={isMobile ? '姓名' : undefined}>
+          <Input placeholder="姓名" allowClear />
+        </Form.Item>
+        <Form.Item name="employeeNo" label={isMobile ? '工号' : undefined}>
+          <Input placeholder="工号" allowClear />
+        </Form.Item>
+        <Form.Item name="departmentId" label={isMobile ? '部门' : undefined}>
+          <Select placeholder="部门" allowClear style={{ width: isMobile ? '100%' : 200 }}>
+            {flattenDepartments(departmentTree).map((dept) => (
+              <Select.Option key={dept.id} value={dept.id}>
+                {dept.deptName}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+        <Form.Item name="status" label={isMobile ? '状态' : undefined}>
+          <Select placeholder="状态" allowClear style={{ width: isMobile ? '100%' : 120 }}>
+            <Select.Option value={1}>在职</Select.Option>
+            <Select.Option value={0}>离职</Select.Option>
+          </Select>
+        </Form.Item>
+      </ResponsiveSearch>
 
-      <div className="toolbar">
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-          新增员工
-        </Button>
-        <Button icon={<ReloadOutlined />} onClick={fetchList}>
-          刷新
-        </Button>
-      </div>
-
-      <Table
-        columns={columns}
-        dataSource={tableData}
-        rowKey="id"
-        loading={loading}
-        scroll={{ x: 1400 }}
-        pagination={{
-          current: pagination.current,
-          pageSize: pagination.pageSize,
-          total: pagination.total,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: handleTableChange,
-        }}
-      />
+      {isMobile ? (
+        <MobileCardList
+          dataSource={tableData}
+          loading={loading}
+          rowKey="id"
+          titleField={{ key: 'name', label: '姓名' }}
+          fields={mobileFields}
+          actions={mobileActions}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            onChange: handleTableChange,
+          }}
+        />
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={tableData}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 1400 }}
+          pagination={{
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: pagination.total,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: handleTableChange,
+          }}
+        />
+      )}
 
       <EmployeeModal
         visible={modalVisible}

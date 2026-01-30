@@ -1,0 +1,96 @@
+.responsive-search {
+  margin-bottom: 16px;
+}
+
+// PC 端样式
+.responsive-search-desktop {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+
+  .search-form {
+    .ant-form-item {
+      margin-bottom: 8px;
+    }
+  }
+}
+
+// 移动端样式
+.responsive-search-mobile {
+  background: #fff;
+  border-radius: 8px;
+  margin-bottom: 12px;
+
+  .search-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .search-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #1890ff;
+
+    .anticon {
+      font-size: 14px;
+    }
+  }
+
+  .search-extra {
+    .ant-btn {
+      padding: 4px 12px;
+    }
+  }
+
+  .search-collapse {
+    .ant-collapse-header {
+      display: none !important;
+    }
+
+    .ant-collapse-content-box {
+      padding: 12px !important;
+    }
+  }
+
+  .search-form-mobile {
+    .ant-form-item {
+      margin-bottom: 12px;
+
+      .ant-form-item-label {
+        padding-bottom: 4px;
+
+        > label {
+          font-size: 13px;
+          color: #666;
+        }
+      }
+    }
+
+    .ant-input,
+    .ant-select-selector,
+    .ant-picker {
+      width: 100% !important;
+    }
+  }
+
+  .search-actions {
+    margin-top: 8px;
+
+    .ant-space {
+      display: flex;
+
+      .ant-space-item {
+        flex: 1;
+      }
+    }
+
+    .ant-btn {
+      height: 40px;
+    }
+  }
+}

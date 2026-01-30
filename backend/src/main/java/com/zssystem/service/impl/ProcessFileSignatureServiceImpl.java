@@ -45,11 +45,12 @@ public class ProcessFileSignatureServiceImpl implements ProcessFileSignatureServ
     // 签名类型映射
     private static final Map<String, String> SIGNATURE_TYPE_MAP = new HashMap<>();
     
+    // 审批流程：车间主任审核(LEVEL1) → 生产技术部经理批准(LEVEL2) → 注塑部经理会签(LEVEL3)
     static {
-        SIGNATURE_TYPE_MAP.put("SUBMIT", "提交");
+        SIGNATURE_TYPE_MAP.put("SUBMIT", "提交（编制人）");
         SIGNATURE_TYPE_MAP.put("APPROVE_LEVEL1", "审核（车间主任）");
-        SIGNATURE_TYPE_MAP.put("APPROVE_LEVEL2", "会签（注塑部经理）");
-        SIGNATURE_TYPE_MAP.put("APPROVE_LEVEL3", "批准（生产技术部经理）");
+        SIGNATURE_TYPE_MAP.put("APPROVE_LEVEL2", "批准（生产技术部经理）");
+        SIGNATURE_TYPE_MAP.put("APPROVE_LEVEL3", "会签（注塑部经理）");
     }
     
     @Override
