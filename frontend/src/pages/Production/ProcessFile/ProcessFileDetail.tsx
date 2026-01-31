@@ -33,7 +33,7 @@ import {
 } from '@/api/processFile';
 import type { ProcessFileInfo } from '@/api/processFile';
 import SignaturePad from '@/components/SignaturePad/SignaturePad';
-import ExcelPreview from '@/components/ExcelPreview/ExcelPreview';
+import ProcessFilePreview from '@/components/ProcessFilePreview/ProcessFilePreview';
 
 /**
  * 工艺文件详情页
@@ -49,8 +49,6 @@ const ProcessFileDetail: React.FC = () => {
   const [signatureModalVisible, setSignatureModalVisible] = useState(false);
   const [pendingSignature, setPendingSignature] = useState<string | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -135,39 +133,9 @@ const ProcessFileDetail: React.FC = () => {
     }
   };
 
-  const handlePreview = async () => {
+  const handlePreview = () => {
     if (!fileDetail) return;
-    
-    setPreviewLoading(true);
-    try {
-      console.log('开始预览工艺文件，ID:', fileDetail.id);
-      const response = await downloadProcessFile(fileDetail.id);
-      
-      // 检查响应状态
-      if (!response || !response.data) {
-        throw new Error('获取文件失败');
-      }
-      
-      // 检查是否是错误响应
-      if (response.data instanceof Blob) {
-        if (response.data.type === 'text/plain' || response.data.type === 'application/json' || response.data.size < 100) {
-          const text = await response.data.text();
-          throw new Error(text || '获取文件失败');
-        }
-      }
-      
-      const blob = response.data instanceof Blob 
-        ? response.data 
-        : new Blob([response.data]);
-      
-      setPreviewBlob(blob);
-      setPreviewVisible(true);
-    } catch (error: any) {
-      console.error('预览工艺文件失败:', error);
-      message.error('预览失败: ' + (error.message || '未知错误'));
-    } finally {
-      setPreviewLoading(false);
-    }
+    setPreviewVisible(true);
   };
 
   const handleApprove = async () => {
@@ -266,7 +234,6 @@ const ProcessFileDetail: React.FC = () => {
             <Button 
               icon={<EyeOutlined />} 
               onClick={handlePreview}
-              loading={previewLoading}
             >
               预览Excel
             </Button>
@@ -500,14 +467,11 @@ const ProcessFileDetail: React.FC = () => {
           />
         </Modal>
 
-        {/* Excel 预览弹窗 */}
-        <ExcelPreview
+        {/* 工艺文件预览弹窗（与下载 Excel 效果一致） */}
+        <ProcessFilePreview
           visible={previewVisible}
-          onClose={() => {
-            setPreviewVisible(false);
-            setPreviewBlob(null);
-          }}
-          fileBlob={previewBlob}
+          onClose={() => setPreviewVisible(false)}
+          fileId={fileDetail?.id ?? null}
           fileName={fileDetail?.fileName}
         />
       </div>

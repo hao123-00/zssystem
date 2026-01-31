@@ -84,6 +84,18 @@ public class ProcessFileExcelGenerator {
         
         // ========== 插入产品关键尺寸图片 ==========
         insertKeyDimensionImages(sheet, workbook, processFileDetail);
+
+        // ========== 打印设置：横向、页边距上下左右 0.1 ==========
+        PrintSetup printSetup = sheet.getPrintSetup();
+        printSetup.setLandscape(true);
+        sheet.setMargin(Sheet.LeftMargin, 0.1);
+        sheet.setMargin(Sheet.RightMargin, 0.1);
+        sheet.setMargin(Sheet.TopMargin, 0.1);
+        sheet.setMargin(Sheet.BottomMargin, 0.1);
+        sheet.setMargin(Sheet.HeaderMargin, 0.0);
+        sheet.setMargin(Sheet.FooterMargin, 0.0);
+        sheet.setHorizontallyCenter(true);
+        sheet.setVerticallyCenter(true);
         
         // 保存Excel文件
         LocalDateTime now = LocalDateTime.now();

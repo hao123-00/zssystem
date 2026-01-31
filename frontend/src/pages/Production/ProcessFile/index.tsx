@@ -34,7 +34,7 @@ import {
 } from '@/api/processFile';
 import { getEquipmentList } from '@/api/equipment';
 import SignaturePad from '@/components/SignaturePad/SignaturePad';
-import ExcelPreview from '@/components/ExcelPreview/ExcelPreview';
+import ProcessFilePreview from '@/components/ProcessFilePreview/ProcessFilePreview';
 
 /**
  * 工艺文件列表页
@@ -52,7 +52,7 @@ const ProcessFileList: React.FC = () => {
   const [submitModalVisible, setSubmitModalVisible] = useState(false);
   const [submittingFileId, setSubmittingFileId] = useState<number | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
+  const [previewFileId, setPreviewFileId] = useState<number | null>(null);
   const [previewFileName, setPreviewFileName] = useState<string>('');
   const [batchDeleteVisible, setBatchDeleteVisible] = useState(false);
   const [batchDeleteEquipmentId, setBatchDeleteEquipmentId] = useState<number | undefined>();
@@ -235,35 +235,10 @@ const ProcessFileList: React.FC = () => {
     }
   };
 
-  const handlePreview = async (record: ProcessFileInfo) => {
-    try {
-      console.log('开始预览工艺文件，ID:', record.id);
-      const response = await downloadProcessFile(record.id);
-      
-      // 检查响应状态
-      if (!response || !response.data) {
-        throw new Error('获取文件失败');
-      }
-      
-      // 检查是否是错误响应
-      if (response.data instanceof Blob) {
-        if (response.data.type === 'text/plain' || response.data.type === 'application/json' || response.data.size < 100) {
-          const text = await response.data.text();
-          throw new Error(text || '获取文件失败');
-        }
-      }
-      
-      const blob = response.data instanceof Blob 
-        ? response.data 
-        : new Blob([response.data]);
-      
-      setPreviewBlob(blob);
-      setPreviewFileName(record.fileName || `工艺文件_${record.id}.xlsx`);
-      setPreviewVisible(true);
-    } catch (error: any) {
-      console.error('预览工艺文件失败:', error);
-      message.error('预览失败: ' + (error.message || '未知错误'));
-    }
+  const handlePreview = (record: ProcessFileInfo) => {
+    setPreviewFileId(record.id);
+    setPreviewFileName(record.fileName || `工艺文件_${record.id}.xlsx`);
+    setPreviewVisible(true);
   };
 
   const getStatusTag = (status: number) => {
@@ -525,15 +500,15 @@ const ProcessFileList: React.FC = () => {
         />
       </Modal>
 
-      {/* Excel 预览弹窗 */}
-      <ExcelPreview
+      {/* 工艺文件预览弹窗（与下载 Excel 效果一致） */}
+      <ProcessFilePreview
         visible={previewVisible}
         onClose={() => {
           setPreviewVisible(false);
-          setPreviewBlob(null);
+          setPreviewFileId(null);
           setPreviewFileName('');
         }}
-        fileBlob={previewBlob}
+        fileId={previewFileId}
         fileName={previewFileName}
       />
     </div>

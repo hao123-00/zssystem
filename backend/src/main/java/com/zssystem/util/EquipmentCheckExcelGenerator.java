@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
  */
 public class EquipmentCheckExcelGenerator {
 
-    private static final String NORMAL = "✅";
-    private static final String ABNORMAL = "❌";
+    private static final String NORMAL = "√";
+    private static final String ABNORMAL = "×";
 
     /** 固定设备名称 */
     private static final String FIXED_EQUIPMENT_NAME = "设备名称：注塑机、模温机、冻水机";
@@ -96,6 +96,8 @@ public class EquipmentCheckExcelGenerator {
             }
 
             CellStyle titleStyle = createTitleStyle(workbook);
+            CellStyle firstRowNoTopRightStyle = createFirstRowBorderStyle(workbook);
+            CellStyle descRowNoLeftRightBottomStyle = createDescRowBorderStyle(workbook);
             CellStyle headerStyle = createHeaderStyle(workbook);
             CellStyle centerStyle = createCenterStyle(workbook);
             CellStyle dataStyle = createDataStyle(workbook);
@@ -110,7 +112,7 @@ public class EquipmentCheckExcelGenerator {
             titleCell.setCellValue("注塑成型设备点检表");
             titleCell.setCellStyle(titleStyle);
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, TOTAL_COLS - 1));
-            titleRow.setHeightInPoints(24);
+            titleRow.setHeightInPoints(50);
 
             // ========== 第二行：四格等大（每格占8列）设备名称 | 设备编号 | 点检人 | 年 月 ==========
             Row infoRow = sheet.createRow(rowIdx++);
@@ -120,7 +122,7 @@ public class EquipmentCheckExcelGenerator {
             sheet.addMergedRegion(new CellRangeAddress(1, 1, 8, 15));
             createCell(infoRow, 16, "点检人: " + checkerName, headerStyle);
             sheet.addMergedRegion(new CellRangeAddress(1, 1, 16, 23));
-            createCell(infoRow, 24, "年 " + year + " 月 " + month, headerStyle);
+            createCell(infoRow, 24, year + " 年" + month + "月 ", headerStyle);
             sheet.addMergedRegion(new CellRangeAddress(1, 1, 24, TOTAL_COLS - 1));
 
             // ========== 第三行：A3-B4 合并为“项目”居中；日期(合并30列) ==========
@@ -132,7 +134,7 @@ public class EquipmentCheckExcelGenerator {
             dateRow.getCell(COL_CATEGORY).setCellStyle(centerStyle);
             Cell dateCell = dateRow.createCell(COL_DAY_START);
             dateCell.setCellValue("日期");
-            dateCell.setCellStyle(headerStyle);
+            dateCell.setCellStyle(centerStyle);
             sheet.addMergedRegion(new CellRangeAddress(2, 2, COL_DAY_START, COL_DAY_END));
             // ========== 第四行：0、1 列属 A3:B4 合并区不单独填；2-31 列为 1..30 ==========
             Row dayNumRow = sheet.createRow(rowIdx++);
@@ -166,33 +168,46 @@ public class EquipmentCheckExcelGenerator {
             sheet.getRow(itemStartRow + 6).getCell(COL_CATEGORY).setCellValue("油路部分");
             sheet.getRow(itemStartRow + 11).getCell(COL_CATEGORY).setCellValue("周边设备");
 
-            // ========== 备注（合并整行，多行高度） ==========
+            // ========== 备注（A21:AF21 合并） ==========
             int remarkLabelRowIdx = rowIdx++;
             Row remarkLabelRow = sheet.createRow(remarkLabelRowIdx);
             createCell(remarkLabelRow, COL_CATEGORY, "备注:", headerStyle);
-            createCell(remarkLabelRow, COL_ITEM, "", headerStyle);
-            sheet.addMergedRegion(new CellRangeAddress(remarkLabelRowIdx, remarkLabelRowIdx, COL_ITEM, COL_DAY_END));
+            sheet.addMergedRegion(new CellRangeAddress(remarkLabelRowIdx, remarkLabelRowIdx, COL_CATEGORY, COL_DAY_END));
+            remarkLabelRow.setHeightInPoints(100);
             int remarkRowIdx = rowIdx++;
             Row remarkRow = sheet.createRow(remarkRowIdx);
             Cell remarkCell = remarkRow.createCell(COL_CATEGORY);
             remarkCell.setCellValue(REMARK_ROW_FIXED_TEXT);
-            remarkCell.setCellStyle(centerStyle);
+            remarkCell.setCellStyle(descRowNoLeftRightBottomStyle);
             sheet.addMergedRegion(new CellRangeAddress(remarkRowIdx, remarkRowIdx, COL_CATEGORY, COL_DAY_END));
-            remarkRow.setHeightInPoints(45);
+            remarkRow.setHeightInPoints(32);
 
             // ========== 为所有单元格加上框线（未创建的单元格补上带框线样式） ==========
-            applyBorderToAllCells(sheet, remarkRowIdx, TOTAL_COLS - 1, borderOnlyStyle);
+            applyBorderToAllCells(sheet, remarkRowIdx, TOTAL_COLS - 1, borderOnlyStyle, firstRowNoTopRightStyle);
+            for (int c = COL_CATEGORY; c <= COL_DAY_END; c++) {
+                Cell cell = sheet.getRow(remarkRowIdx).getCell(c);
+                if (cell != null) cell.setCellStyle(descRowNoLeftRightBottomStyle);
+            }
 
-            // ========== 打印设置：适应一页纸 ==========
+            // ========== 打印设置：横向、适应一页纸、页边距 ==========
             sheet.setFitToPage(true);
             PrintSetup printSetup = sheet.getPrintSetup();
+            printSetup.setLandscape(true);
             printSetup.setFitWidth((short) 1);
             printSetup.setFitHeight((short) 1);
+            sheet.setMargin(Sheet.LeftMargin, 0.5);
+            sheet.setMargin(Sheet.RightMargin, 0.5);
+            sheet.setMargin(Sheet.TopMargin, 0.5);
+            sheet.setMargin(Sheet.BottomMargin, 0.5);
             sheet.setAutobreaks(true);
-            sheet.getRow(0).setHeightInPoints(22);
+            sheet.getRow(0).setHeightInPoints(50);
+            for (int r = 1; r <= 3; r++) {
+                Row row = sheet.getRow(r);
+                if (row != null) row.setHeightInPoints(32);
+            }
             for (int r = itemStartRow; r <= itemEndRow; r++) {
                 Row row = sheet.getRow(r);
-                if (row != null) row.setHeightInPoints(18);
+                if (row != null) row.setHeightInPoints(28);
             }
 
             workbook.write(out);
@@ -241,7 +256,10 @@ public class EquipmentCheckExcelGenerator {
         font.setBold(true);
         font.setFontHeightInPoints((short) 16);
         s.setFont(font);
-        setBorder(s);
+        s.setBorderTop(BorderStyle.NONE);
+        s.setBorderLeft(BorderStyle.NONE);
+        s.setBorderRight(BorderStyle.NONE);
+        s.setBorderBottom(BorderStyle.THIN);
         return s;
     }
 
@@ -290,6 +308,30 @@ public class EquipmentCheckExcelGenerator {
         s.setBorderRight(BorderStyle.THIN);
     }
 
+    /** 说明行专用：去掉左、右、下框线（合并单元格仅保留上框线） */
+    private static CellStyle createDescRowBorderStyle(Workbook wb) {
+        CellStyle s = wb.createCellStyle();
+        s.setAlignment(HorizontalAlignment.LEFT);
+        s.setVerticalAlignment(VerticalAlignment.CENTER);
+        s.setBorderTop(BorderStyle.THIN);
+        s.setBorderLeft(BorderStyle.NONE);
+        s.setBorderRight(BorderStyle.NONE);
+        s.setBorderBottom(BorderStyle.NONE);
+        return s;
+    }
+
+    /** 第一行 A1:AF1 专用：去掉上、右框线，仅保留下框线（用于合并区域内所有单元格） */
+    private static CellStyle createFirstRowBorderStyle(Workbook wb) {
+        CellStyle s = wb.createCellStyle();
+        s.setAlignment(HorizontalAlignment.CENTER);
+        s.setVerticalAlignment(VerticalAlignment.CENTER);
+        s.setBorderTop(BorderStyle.NONE);
+        s.setBorderLeft(BorderStyle.NONE);
+        s.setBorderRight(BorderStyle.NONE);
+        s.setBorderBottom(BorderStyle.THIN);
+        return s;
+    }
+
     /** 仅框线的样式（用于补全空单元格的框线） */
     private static CellStyle createBorderOnlyStyle(Workbook wb) {
         CellStyle s = wb.createCellStyle();
@@ -299,16 +341,20 @@ public class EquipmentCheckExcelGenerator {
         return s;
     }
 
-    /** 为范围内未创建的单元格补上带框线样式，使整表所有格子都有框线 */
-    private static void applyBorderToAllCells(Sheet sheet, int lastRowIndex, int lastColIndex, CellStyle borderStyle) {
+    /** 为范围内未创建的单元格补上带框线样式；第一行使用 firstRowStyle（去掉上、右框线） */
+    private static void applyBorderToAllCells(Sheet sheet, int lastRowIndex, int lastColIndex,
+            CellStyle borderStyle, CellStyle firstRowStyle) {
         for (int r = 0; r <= lastRowIndex; r++) {
             Row row = sheet.getRow(r);
             if (row == null) row = sheet.createRow(r);
+            CellStyle style = (r == 0) ? firstRowStyle : borderStyle;
             for (int c = 0; c <= lastColIndex; c++) {
                 Cell cell = row.getCell(c);
                 if (cell == null) {
                     cell = row.createCell(c);
-                    cell.setCellStyle(borderStyle);
+                    cell.setCellStyle(style);
+                } else if (r == 0 && c > 0) {
+                    cell.setCellStyle(firstRowStyle);
                 }
             }
         }

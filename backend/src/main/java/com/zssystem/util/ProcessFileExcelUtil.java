@@ -89,7 +89,7 @@ public class ProcessFileExcelUtil {
             
             // 插入图片到Excel（传递签名类型用于特殊处理）
             insertImageToCell(sheet, position, croppedImageBytes, workbook, signatureType);
-            
+            applyPrintSettings(sheet);
             // 保存Excel文件
             try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
                 workbook.write(fos);
@@ -542,13 +542,15 @@ public class ProcessFileExcelUtil {
                 drawing = xssfSheet.createDrawingPatriarch();
             }
             int pictureIndex = xssfWorkbook.addPicture(sealBytes, Workbook.PICTURE_TYPE_PNG);
+            // 使用 DONT_MOVE_AND_RESIZE 使受控章浮于文字上方，不改变 Excel 布局
             XSSFClientAnchor anchor = new XSSFClientAnchor(
                 0, 0, 0, 0,
                 (short) SEAL_COL1, SEAL_ROW1,
                 (short) SEAL_COL2, SEAL_ROW2
             );
-            anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
+            anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
             drawing.createPicture(anchor, pictureIndex);
+            applyPrintSettings(sheet);
             try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
                 workbook.write(fos);
             }
@@ -561,6 +563,36 @@ public class ProcessFileExcelUtil {
         }
     }
     
+    /** 工艺卡打印设置：横向，页边距上下左右 0.1，水平垂直居中 */
+    private static void applyPrintSettings(Sheet sheet) {
+        PrintSetup ps = sheet.getPrintSetup();
+        ps.setLandscape(true);
+        sheet.setMargin(Sheet.LeftMargin, 0.1);
+        sheet.setMargin(Sheet.RightMargin, 0.1);
+        sheet.setMargin(Sheet.TopMargin, 0.1);
+        sheet.setMargin(Sheet.BottomMargin, 0.1);
+        sheet.setHorizontallyCenter(true);
+        sheet.setVerticallyCenter(true);
+    }
+
+    /** 对已存在的 Excel 文件应用打印设置（横向、页边距 0.1） */
+    public static void applyPrintSettingsToFile(String excelFilePath) {
+        File f = new File(excelFilePath);
+        if (!f.exists()) return;
+        try (FileInputStream fis = new FileInputStream(f);
+             Workbook wb = new XSSFWorkbook(fis)) {
+            Sheet sheet = wb.getSheetAt(0);
+            if (sheet != null) {
+                applyPrintSettings(sheet);
+                try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
+                    wb.write(fos);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("应用打印设置失败: " + e.getMessage());
+        }
+    }
+
     /**
      * 生成受控章图片：红矩形边框 + 红色「受控」横排居中，透明底，半透明水印效果。外框长度减少 40%（为原 60%）。
      */

@@ -464,176 +464,50 @@ public class ProcessFileServiceImpl implements ProcessFileService {
     
     @Override
     public byte[] downloadProcessFile(Long fileId) throws IOException {
-        System.out.println("开始下载工艺文件，ID: " + fileId);
-        
+        String excelFilePath = ensureExcelReadyAndGetPath(fileId);
+        Path path = Paths.get(excelFilePath);
+        byte[] fileContent = Files.readAllBytes(path);
+        return fileContent;
+    }
+
+    @Override
+    public String getPreviewHtml(Long fileId) throws IOException {
+        String excelFilePath = ensureExcelReadyAndGetPath(fileId);
+        return com.zssystem.util.ProcessFileExcelToHtmlConverter.convertToHtml(excelFilePath);
+    }
+
+    /**
+     * 确保 Excel 文件已生成且包含最新签名和受控章，返回文件路径
+     */
+    private String ensureExcelReadyAndGetPath(Long fileId) throws IOException {
+        System.out.println("开始准备工艺文件，ID: " + fileId);
         ProcessFile file = processFileMapper.selectById(fileId);
         if (file == null) {
-            System.err.println("工艺文件不存在，ID: " + fileId);
             throw new RuntimeException("文件不存在");
         }
-        
-        System.out.println("工艺文件信息 - 文件类型: " + file.getFileType() + ", 文件路径: " + file.getFilePath());
-        
         String excelFilePath = file.getFilePath();
-        boolean needGenerate = false;
-        
-        // 判断是否需要生成Excel
-        if ("form".equals(file.getFileType())) {
-            System.out.println("检测到表单方式，需要生成Excel");
-            needGenerate = true;
-        } else if (excelFilePath == null || excelFilePath.isEmpty()) {
-            System.out.println("文件路径为空，需要生成Excel");
-            needGenerate = true;
-        } else {
-            Path existingPath = Paths.get(excelFilePath);
-            if (!Files.exists(existingPath)) {
-                System.out.println("文件不存在: " + excelFilePath + "，需要生成Excel");
-                needGenerate = true;
-            } else {
-                System.out.println("Excel文件已存在: " + excelFilePath);
-            }
-        }
-        
-        // 如果需要生成Excel
+        boolean needGenerate = "form".equals(file.getFileType())
+                || excelFilePath == null || excelFilePath.isEmpty()
+                || !Files.exists(Paths.get(excelFilePath));
         if (needGenerate) {
-            try {
-                // 查询详细内容
-                System.out.println("查询工艺文件详细内容...");
-                com.zssystem.entity.ProcessFileDetail detail = processFileDetailMapper.selectOne(
+            com.zssystem.entity.ProcessFileDetail detail = processFileDetailMapper.selectOne(
                     new LambdaQueryWrapper<com.zssystem.entity.ProcessFileDetail>()
-                        .eq(com.zssystem.entity.ProcessFileDetail::getFileId, fileId)
-                        .last("LIMIT 1")
-                );
-                
-                if (detail == null) {
-                    System.err.println("工艺文件详细内容不存在，文件ID: " + fileId);
-                    throw new RuntimeException("工艺文件详细内容不存在");
-                }
-                
-                System.out.println("工艺文件详细内容查询成功");
-                
-                // 查询设备信息
-                System.out.println("查询设备信息，设备ID: " + file.getEquipmentId());
-                Equipment equipment = equipmentMapper.selectById(file.getEquipmentId());
-                if (equipment == null) {
-                    System.err.println("设备信息不存在，设备ID: " + file.getEquipmentId());
-                    throw new RuntimeException("设备信息不存在");
-                }
-                
-                System.out.println("设备信息查询成功: " + equipment.getEquipmentName());
-                
-                // 生成Excel文件
-                System.out.println("开始生成Excel文件，保存路径: " + uploadPath);
-                excelFilePath = com.zssystem.util.ProcessFileExcelGenerator.generateProcessFileExcel(
-                    file,
-                    detail,
-                    equipment,
-                    uploadPath
-                );
-                
-                System.out.println("Excel文件生成成功: " + excelFilePath);
-                
-                // 更新文件路径
-                file.setFilePath(excelFilePath);
-                java.io.File excelFile = new java.io.File(excelFilePath);
-                if (!excelFile.exists()) {
-                    System.err.println("生成的Excel文件不存在: " + excelFilePath);
-                    throw new RuntimeException("Excel文件生成失败");
-                }
-                
-                file.setFileSize(excelFile.length());
-                file.setFileType("xlsx");
-                processFileMapper.updateById(file);
-                System.out.println("文件信息已更新到数据库");
-                
-                // 插入所有已保存的签名
-                if (signatureService != null) {
-                    try {
-                        System.out.println("开始插入签名到Excel...");
-                        // 查询所有签名
-                        List<com.zssystem.vo.ProcessFileSignatureVO> signatures = signatureService.getSignaturesByFileId(fileId);
-                        System.out.println("查询到 " + (signatures != null ? signatures.size() : 0) + " 个签名");
-                        
-                        if (signatures != null && !signatures.isEmpty()) {
-                            System.out.println("========== 开始处理签名列表 ==========");
-                            for (int i = 0; i < signatures.size(); i++) {
-                                com.zssystem.vo.ProcessFileSignatureVO signature = signatures.get(i);
-                                String signatureType = signature.getSignatureType();
-                                String signatureImagePath = signature.getSignatureImagePath();
-                                
-                                System.out.println("签名[" + (i+1) + "/" + signatures.size() + "] - 类型: " + signatureType + ", 路径: " + signatureImagePath);
-                                
-                                if (signatureImagePath != null && !signatureImagePath.isEmpty()) {
-                                    // 检查签名图片文件是否存在
-                                    java.io.File signatureFile = new java.io.File(signatureImagePath);
-                                    if (!signatureFile.exists()) {
-                                        System.err.println("签名图片文件不存在: " + signatureImagePath);
-                                        continue;
-                                    }
-                                    
-                                    // 插入签名到Excel
-                                    com.zssystem.util.ProcessFileExcelGenerator.insertSignatureToGeneratedExcel(
-                                        excelFilePath,
-                                        signatureImagePath,
-                                        signatureType
-                                    );
-                                    System.out.println("签名插入成功: " + signatureType);
-                                }
-                            }
-                        }
-                        
-                        System.out.println("所有签名已插入到Excel");
-                    } catch (Exception e) {
-                        System.err.println("插入签名到Excel失败: " + e.getMessage());
-                        e.printStackTrace();
-                        // 不阻止下载，但记录错误
-                    }
-                } else {
-                    System.out.println("签名服务未注入，跳过签名插入");
-                }
-            } catch (Exception e) {
-                System.err.println("生成Excel文件失败: " + e.getMessage());
-                e.printStackTrace();
-                throw new RuntimeException("生成Excel文件失败: " + e.getMessage(), e);
-            }
+                            .eq(com.zssystem.entity.ProcessFileDetail::getFileId, fileId).last("LIMIT 1"));
+            if (detail == null) throw new RuntimeException("工艺文件详细内容不存在");
+            Equipment equipment = equipmentMapper.selectById(file.getEquipmentId());
+            if (equipment == null) throw new RuntimeException("设备信息不存在");
+            excelFilePath = com.zssystem.util.ProcessFileExcelGenerator.generateProcessFileExcel(
+                    file, detail, equipment, uploadPath);
+            file.setFilePath(excelFilePath);
+            java.io.File excelFile = new java.io.File(excelFilePath);
+            if (!excelFile.exists()) throw new RuntimeException("Excel文件生成失败");
+            file.setFileSize(excelFile.length());
+            file.setFileType("xlsx");
+            processFileMapper.updateById(file);
+            insertSignaturesToExcel(excelFilePath, fileId);
         } else {
-            // Excel文件已存在，检查是否需要插入签名
-            if (signatureService != null) {
-                try {
-                    System.out.println("Excel文件已存在，检查是否需要插入签名...");
-                    List<com.zssystem.vo.ProcessFileSignatureVO> signatures = signatureService.getSignaturesByFileId(fileId);
-                    
-                    if (signatures != null && !signatures.isEmpty()) {
-                        System.out.println("发现 " + signatures.size() + " 个签名，检查是否已插入...");
-                        
-                        // 检查Excel中是否已有签名（简单检查：如果文件最近被修改过，可能已插入）
-                        // 为了确保签名总是最新的，每次都重新插入
-                        for (com.zssystem.vo.ProcessFileSignatureVO signature : signatures) {
-                            String signatureType = signature.getSignatureType();
-                            String signatureImagePath = signature.getSignatureImagePath();
-                            
-                            if (signatureImagePath != null && !signatureImagePath.isEmpty()) {
-                                java.io.File signatureFile = new java.io.File(signatureImagePath);
-                                if (signatureFile.exists()) {
-                                    System.out.println("插入签名到已存在的Excel: " + signatureType);
-                                    com.zssystem.util.ProcessFileExcelGenerator.insertSignatureToGeneratedExcel(
-                                        excelFilePath,
-                                        signatureImagePath,
-                                        signatureType
-                                    );
-                                }
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    System.err.println("插入签名到已存在的Excel失败: " + e.getMessage());
-                    e.printStackTrace();
-                    // 不阻止下载，但记录错误
-                }
-            }
+            insertSignaturesToExcel(excelFilePath, fileId);
         }
-        
-        // 会签完成（状态5）时在 Excel 区域 L24:P27 加盖受控章
         if (file.getStatus() != null && file.getStatus() == 5) {
             try {
                 com.zssystem.util.ProcessFileExcelUtil.insertControlledSealToExcel(excelFilePath);
@@ -641,19 +515,29 @@ public class ProcessFileServiceImpl implements ProcessFileService {
                 System.err.println("插入受控章失败: " + e.getMessage());
             }
         }
-        
-        // 读取Excel文件
-        System.out.println("读取Excel文件: " + excelFilePath);
-        Path path = Paths.get(excelFilePath);
-        if (!Files.exists(path)) {
-            System.err.println("Excel文件不存在: " + excelFilePath);
-            throw new RuntimeException("Excel文件生成失败或不存在: " + excelFilePath);
+        if (!Files.exists(Paths.get(excelFilePath))) {
+            throw new RuntimeException("Excel文件生成失败或不存在");
         }
-        
-        byte[] fileContent = Files.readAllBytes(path);
-        System.out.println("文件读取成功，大小: " + fileContent.length + " 字节");
-        
-        return fileContent;
+        com.zssystem.util.ProcessFileExcelUtil.applyPrintSettingsToFile(excelFilePath);
+        return excelFilePath;
+    }
+
+    private void insertSignaturesToExcel(String excelFilePath, Long fileId) {
+        if (signatureService == null) return;
+        try {
+            List<com.zssystem.vo.ProcessFileSignatureVO> signatures = signatureService.getSignaturesByFileId(fileId);
+            if (signatures != null) {
+                for (com.zssystem.vo.ProcessFileSignatureVO s : signatures) {
+                    String sp = s.getSignatureImagePath();
+                    if (sp != null && !sp.isEmpty() && new java.io.File(sp).exists()) {
+                        com.zssystem.util.ProcessFileExcelGenerator.insertSignatureToGeneratedExcel(
+                                excelFilePath, sp, s.getSignatureType());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("插入签名失败: " + e.getMessage());
+        }
     }
     
     @Override

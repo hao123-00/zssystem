@@ -223,6 +223,13 @@ export const downloadProcessFile = (id: number) => {
 };
 
 /**
+ * 获取工艺文件 HTML 预览（与下载 Excel 效果一致）
+ */
+export const getProcessFilePreviewHtml = (id: number) => {
+  return request.get<string>(`/production/process-file/${id}/preview`);
+};
+
+/**
  * 查询设备的工艺文件列表
  */
 export const getProcessFilesByEquipment = (equipmentId: number, pageNum: number, pageSize: number) => {

@@ -249,6 +249,19 @@ public class ProcessFileController {
     }
 
     /**
+     * 工艺文件 HTML 预览（与下载 Excel 效果一致）
+     */
+    @GetMapping("/{id}/preview")
+    public Result<String> previewHtml(@PathVariable Long id) {
+        try {
+            String html = processFileService.getPreviewHtml(id);
+            return Result.success(html);
+        } catch (Exception e) {
+            return Result.error(e.getMessage() != null ? e.getMessage() : "预览失败");
+        }
+    }
+
+    /**
      * 下载工艺文件
      */
     @GetMapping("/{id}/download")
@@ -274,10 +287,12 @@ public class ProcessFileController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
             
-            // 处理中文文件名编码，使用RFC 5987格式支持中文文件名
+            // 处理中文文件名编码，使用RFC 5987格式支持中文文件名，默认 .xlsx 格式
             String fileName = fileInfo.getFileName();
             if (fileName == null || fileName.isEmpty()) {
                 fileName = "工艺文件_" + id + ".xlsx";
+            } else if (!fileName.toLowerCase().endsWith(".xlsx")) {
+                fileName = fileName.replaceAll("\\.(xls|xlsx)?$", "") + ".xlsx";
             }
             
             String encodedFileName = java.net.URLEncoder.encode(fileName, "UTF-8")

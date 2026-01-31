@@ -66,6 +66,11 @@ public interface ProcessFileService {
      * 下载工艺文件
      */
     byte[] downloadProcessFile(Long fileId) throws IOException;
+
+    /**
+     * 获取工艺文件 HTML 预览（与下载 Excel 效果一致）
+     */
+    String getPreviewHtml(Long fileId) throws IOException;
     
     /**
      * 查询设备的工艺文件列表
