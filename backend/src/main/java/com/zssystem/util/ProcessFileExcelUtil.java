@@ -13,7 +13,9 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 /**
  * 工艺文件Excel签名插入工具类
@@ -56,8 +58,8 @@ public class ProcessFileExcelUtil {
         }
         System.out.println("签名图片存在，大小: " + signatureFile.length() + " 字节");
         
-        try (FileInputStream fis = new FileInputStream(excelFilePath);
-             Workbook workbook = new XSSFWorkbook(fis)) {
+        try (Workbook wb = WorkbookFactory.create(excelFile);
+             XSSFWorkbook workbook = (XSSFWorkbook) wb) {
             
             Sheet sheet = workbook.getSheetAt(0); // 使用第一个Sheet
             System.out.println("Sheet名称: " + sheet.getSheetName());
@@ -90,11 +92,13 @@ public class ProcessFileExcelUtil {
             // 插入图片到Excel（传递签名类型用于特殊处理）
             insertImageToCell(sheet, position, croppedImageBytes, workbook, signatureType);
             applyPrintSettings(sheet);
-            // 保存Excel文件
-            try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
+            // 保存到临时文件再替换，避免 ZIP 读取异常
+            Path tempFile = Files.createTempFile("process_sig_", ".xlsx");
+            try (FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
                 workbook.write(fos);
                 System.out.println("Excel文件已保存");
             }
+            Files.move(tempFile, Paths.get(excelFilePath), StandardCopyOption.REPLACE_EXISTING);
             
             System.out.println("========== 签名图片已成功插入到Excel ==========");
             System.out.println("标签: " + labelText + ", 位置: " + position);
@@ -524,8 +528,8 @@ public class ProcessFileExcelUtil {
             System.err.println("insertControlledSeal: Excel文件不存在: " + excelFilePath);
             return false;
         }
-        try (FileInputStream fis = new FileInputStream(excelFilePath);
-             Workbook workbook = new XSSFWorkbook(fis)) {
+        try (Workbook wb = WorkbookFactory.create(excelFile);
+             XSSFWorkbook workbook = (XSSFWorkbook) wb) {
             Sheet sheet = workbook.getSheetAt(0);
             if (!(sheet instanceof XSSFSheet) || !(workbook instanceof XSSFWorkbook)) {
                 return false;
@@ -551,9 +555,11 @@ public class ProcessFileExcelUtil {
             anchor.setAnchorType(ClientAnchor.AnchorType.DONT_MOVE_AND_RESIZE);
             drawing.createPicture(anchor, pictureIndex);
             applyPrintSettings(sheet);
-            try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
+            Path tempFile = Files.createTempFile("process_seal_", ".xlsx");
+            try (FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
                 workbook.write(fos);
             }
+            Files.move(tempFile, Paths.get(excelFilePath), StandardCopyOption.REPLACE_EXISTING);
             System.out.println("受控章已插入到 Excel 区域 L24:P27");
             return true;
         } catch (Exception e) {
@@ -579,14 +585,15 @@ public class ProcessFileExcelUtil {
     public static void applyPrintSettingsToFile(String excelFilePath) {
         File f = new File(excelFilePath);
         if (!f.exists()) return;
-        try (FileInputStream fis = new FileInputStream(f);
-             Workbook wb = new XSSFWorkbook(fis)) {
+        try (Workbook wb = WorkbookFactory.create(f)) {
             Sheet sheet = wb.getSheetAt(0);
             if (sheet != null) {
                 applyPrintSettings(sheet);
-                try (FileOutputStream fos = new FileOutputStream(excelFilePath)) {
+                Path tempFile = Files.createTempFile("process_print_", ".xlsx");
+                try (FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
                     wb.write(fos);
                 }
+                Files.move(tempFile, Paths.get(excelFilePath), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (Exception e) {
             System.err.println("应用打印设置失败: " + e.getMessage());

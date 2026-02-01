@@ -29,6 +29,8 @@ import {
   submitProcessFile,
   deleteProcessFile,
   batchDeleteProcessFileByEquipment,
+  enableProcessFile,
+  archiveProcessFile,
   downloadProcessFile,
   uploadSignature,
 } from '@/api/processFile';
@@ -68,6 +70,11 @@ const ProcessFileList: React.FC = () => {
     { label: '已批准（生效中）', value: 5 },
     { label: '已驳回', value: -1 },
     { label: '已作废', value: -2 },
+  ];
+
+  const enabledOptions = [
+    { label: '启用', value: 1 },
+    { label: '备用', value: 0 },
   ];
 
   useEffect(() => {
@@ -142,7 +149,9 @@ const ProcessFileList: React.FC = () => {
   const handleDelete = async (id: number) => {
     Modal.confirm({
       title: '确认删除',
-      content: '确定要删除此工艺文件吗？删除后状态为已作废。',
+      content: '确定要物理删除此工艺文件吗？删除后数据无法恢复。',
+      okText: '确认删除',
+      okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await deleteProcessFile(id);
@@ -155,13 +164,35 @@ const ProcessFileList: React.FC = () => {
     });
   };
 
+  const handleEnable = async (id: number) => {
+    try {
+      await enableProcessFile(id);
+      message.success('已启用');
+      fetchList();
+    } catch (error: any) {
+      message.error(error.message || '启用失败');
+    }
+  };
+
+  const handleArchive = async (id: number) => {
+    try {
+      await archiveProcessFile(id);
+      message.success('已设为备用');
+      fetchList();
+    } catch (error: any) {
+      message.error(error.message || '设为备用失败');
+    }
+  };
+
   const openBatchDelete = () => {
     setBatchDeleteVisible(true);
     setBatchDeleteEquipmentId(undefined);
-    getEquipmentList({ pageNum: 1, pageSize: 500 }).then((res: any) => {
-      const list = res?.list ?? res?.data?.list ?? [];
-      setEquipmentList(Array.isArray(list) ? list : []);
-    }).catch(() => message.error('加载设备列表失败'));
+    getEquipmentList({ pageNum: 1, pageSize: 500 })
+      .then((res: any) => {
+        const list = res?.list ?? res?.data?.list ?? [];
+        setEquipmentList(Array.isArray(list) ? list : []);
+      })
+      .catch(() => message.error('加载设备列表失败'));
   };
 
   const handleBatchDeleteOk = async () => {
@@ -173,7 +204,7 @@ const ProcessFileList: React.FC = () => {
     try {
       const res: any = await batchDeleteProcessFileByEquipment(batchDeleteEquipmentId);
       const count = typeof res === 'number' ? res : (res?.data ?? res?.count ?? 0);
-      message.success(`已删除该机台下 ${count} 个工艺文件`);
+      message.success(`已物理删除该机台下 ${count} 个工艺文件`);
       setBatchDeleteVisible(false);
       setBatchDeleteEquipmentId(undefined);
       fetchList();
@@ -302,6 +333,15 @@ const ProcessFileList: React.FC = () => {
       ),
     },
     {
+      title: '启用状态',
+      dataIndex: 'enabledText',
+      key: 'enabledText',
+      width: 90,
+      render: (text: string, record: ProcessFileInfo) => (
+        <Tag color={record.enabled === 1 ? 'green' : 'default'}>{text || '备用'}</Tag>
+      ),
+    },
+    {
       title: '创建人',
       dataIndex: 'creatorName',
       key: 'creatorName',
@@ -356,6 +396,25 @@ const ProcessFileList: React.FC = () => {
               提交
             </Button>
           )}
+          {record.status === 5 && record.enabled !== 1 && (
+            <Button
+              type="link"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleEnable(record.id)}
+            >
+              启用
+            </Button>
+          )}
+          {record.status === 5 && record.enabled === 1 && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => handleArchive(record.id)}
+            >
+              备用
+            </Button>
+          )}
           {(record.status === 0 || record.status === -2) && (
             <Button
               type="link"
@@ -394,6 +453,14 @@ const ProcessFileList: React.FC = () => {
               allowClear
               style={{ width: 180 }}
               options={statusOptions}
+            />
+          </Form.Item>
+          <Form.Item name="enabled" label="启用状态">
+            <Select
+              placeholder="请选择"
+              allowClear
+              style={{ width: 100 }}
+              options={enabledOptions}
             />
           </Form.Item>
           <Form.Item>
@@ -458,10 +525,10 @@ const ProcessFileList: React.FC = () => {
         }}
         onOk={handleBatchDeleteOk}
         confirmLoading={batchDeleting}
-        okText="确定删除"
+        okText="确定物理删除"
         okButtonProps={{ danger: true }}
       >
-        <p style={{ marginBottom: 12 }}>选择机台（设备）后，将把该机台下所有工艺文件作废删除。</p>
+        <p style={{ marginBottom: 12 }}>选择机台（设备）后，将把该机台下所有工艺文件物理删除，数据无法恢复。</p>
         <Form.Item label="选择机台号" required>
           <Select
             placeholder="请选择机台号"

@@ -52,15 +52,36 @@ public interface ProcessFileService {
     void approveProcessFile(ProcessFileApprovalDTO approvalDTO, Long currentUserId, String currentUserName, String currentUserRole, Long signatureId);
     
     /**
-     * 作废工艺文件（删除）
+     * 作废工艺文件（保留接口，状态改为已作废）
      */
     void invalidateProcessFile(Long fileId, Long currentUserId);
+    
+    /**
+     * 物理删除工艺文件（删除数据库记录及关联文件）
+     */
+    void deleteProcessFilePhysical(Long fileId);
+    
+    /**
+     * 按设备（机台号）批量物理删除工艺文件
+     * @return 删除的数量
+     */
+    int batchDeleteByEquipmentIdPhysical(Long equipmentId);
     
     /**
      * 按设备（机台号）批量作废工艺文件
      * @return 作废的数量
      */
     int batchInvalidateByEquipmentId(Long equipmentId, Long currentUserId);
+    
+    /**
+     * 启用工艺文件（同机台号其他工艺文件自动设为搁置）
+     */
+    void setEnabled(Long fileId);
+    
+    /**
+     * 搁置工艺文件
+     */
+    void setArchived(Long fileId);
     
     /**
      * 下载工艺文件
@@ -71,6 +92,11 @@ public interface ProcessFileService {
      * 获取工艺文件 HTML 预览（与下载 Excel 效果一致）
      */
     String getPreviewHtml(Long fileId) throws IOException;
+
+    /**
+     * 获取工艺文件 HTML（PDF 友好格式，用于转 PDF）
+     */
+    String getPreviewHtmlForPdf(Long fileId) throws IOException;
     
     /**
      * 查询设备的工艺文件列表

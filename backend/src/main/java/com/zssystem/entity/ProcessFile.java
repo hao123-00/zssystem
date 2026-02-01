@@ -31,6 +31,8 @@ public class ProcessFile {
     private LocalDateTime invalidTime;
     private String sealImagePath;
     private Integer isCurrent;
+    /** 启用状态：1-启用，0-搁置，同机台号只能有一个启用 */
+    private Integer enabled;
     private Long parentFileId;
     private String changeReason;
     private String remark;

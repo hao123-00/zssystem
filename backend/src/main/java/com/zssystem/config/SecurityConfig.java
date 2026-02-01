@@ -42,6 +42,7 @@ public class SecurityConfig {
                     // 允许 CORS 预检请求（否则前端带 Authorization 会先发 OPTIONS，触发 403）
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/auth/login", "/api/auth/refresh", "/doc.html", "/webjars/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                    .requestMatchers("/api/qr/**").permitAll()
                     .anyRequest().authenticated()
                 );
 

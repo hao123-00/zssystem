@@ -5,7 +5,6 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.*;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -20,8 +19,9 @@ public class ProcessFileExcelToHtmlConverter {
     private static final int SEAL_COL2 = 15;
     private static final int SEAL_ROW2 = 26;
 
-    private static final String STYLE = """
+    private static final String STYLE_WEB = """
         <style>
+          @page { size: A4 landscape; margin: 5mm; }
           body { font-family: "Microsoft YaHei", SimSun, sans-serif; font-size: 11pt; margin: 12px; }
           .pf-preview-wrap { position: relative; }
           table { border-collapse: collapse; table-layout: fixed; }
@@ -31,9 +31,31 @@ public class ProcessFileExcelToHtmlConverter {
           .left { text-align: left; }
           .right { text-align: right; }
           .vertical { writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(-90deg); white-space: nowrap; }
-          td img:not(.pf-seal-img) { max-width: 100%; height: auto; display: block; }
-          .pf-seal-overlay { position: absolute; pointer-events: none; z-index: 10; }
-          .pf-seal-overlay img { max-width: 100%; height: auto; display: block; }
+          td img { max-width: 100%; height: auto; display: block; }
+          .pf-seal-cell { position: relative; }
+          .pf-seal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
+          .pf-seal-overlay img { max-width: 80%; max-height: 80%; object-fit: contain; }
+        </style>
+        """;
+    /** PDF 用样式：每行等高铺满一页，A4 横向内容区约 575pt */
+    private static final double PDF_TABLE_HEIGHT_PT = 575;
+
+    private static final String STYLE_PDF = """
+        <style>
+          @page { size: A4 landscape; margin: 1mm; }
+          body { font-family: 'NotoSansSC', sans-serif; font-size: 4pt; margin: 0; padding: 0; line-height: 1.1; }
+          table { border-collapse: collapse; table-layout: fixed; page-break-inside: avoid; font-size: 4pt; width: 100%; }
+          td { border: 1px solid #000; padding: 0; vertical-align: middle; line-height: 1.1; }
+          .wrap { word-wrap: break-word; white-space: pre-wrap; }
+          .center { text-align: center; }
+          .left { text-align: left; }
+          .right { text-align: right; }
+          .pf-preview-wrap { width: 100%; max-width: 100%; }
+          td img { max-width: 100%; max-height: 16px; }
+          td img.pf-seal-img { max-height: 40px; max-width: 80px; }
+          .pf-seal-cell { position: relative; }
+          .pf-seal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
+          .pf-seal-overlay img { max-width: 80%; max-height: 80%; object-fit: contain; }
         </style>
         """;
 
@@ -45,8 +67,21 @@ public class ProcessFileExcelToHtmlConverter {
         if (!file.exists()) {
             throw new IOException("Excel 文件不存在: " + excelFilePath);
         }
-        try (FileInputStream fis = new FileInputStream(file)) {
-            return convertToHtml(fis);
+        try (Workbook workbook = WorkbookFactory.create(file)) {
+            return convertWorkbookToHtml(workbook, false);
+        }
+    }
+
+    /**
+     * 将 Excel 文件转换为 PDF 友好的 HTML
+     */
+    public static String convertToHtmlForPdf(String excelFilePath) throws IOException {
+        File file = new File(excelFilePath);
+        if (!file.exists()) {
+            throw new IOException("Excel 文件不存在: " + excelFilePath);
+        }
+        try (Workbook workbook = WorkbookFactory.create(file)) {
+            return convertWorkbookToHtml(workbook, true);
         }
     }
 
@@ -55,13 +90,23 @@ public class ProcessFileExcelToHtmlConverter {
      */
     public static String convertToHtml(InputStream inputStream) throws IOException {
         try (Workbook workbook = WorkbookFactory.create(inputStream)) {
-            return convertWorkbookToHtml(workbook);
+            return convertWorkbookToHtml(workbook, false);
         }
     }
 
-    private static String convertWorkbookToHtml(Workbook workbook) throws IOException {
+    /**
+     * 转换为 PDF 友好的 HTML（无 position:absolute 等复杂布局，便于 openhtmltopdf 渲染）
+     */
+    public static String convertToHtmlForPdf(InputStream inputStream) throws IOException {
+        try (Workbook workbook = WorkbookFactory.create(inputStream)) {
+            return convertWorkbookToHtml(workbook, true);
+        }
+    }
+
+    private static String convertWorkbookToHtml(Workbook workbook, boolean forPdf) throws IOException {
         StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">").append(STYLE).append("</head><body>");
+        String style = forPdf ? STYLE_PDF : STYLE_WEB;
+        html.append("<!DOCTYPE html><html><head><meta charset=\"UTF-8\">").append(style).append("</head><body>");
 
         Sheet sheet = workbook.getSheetAt(0);
         int lastRowNum = sheet.getLastRowNum();
@@ -103,9 +148,16 @@ public class ProcessFileExcelToHtmlConverter {
 
         html.append("<div class=\"pf-preview-wrap\"><table>");
 
+        int rowCount = lastRowNum + 1;
+        double rowHeightPt = forPdf && rowCount > 0 ? PDF_TABLE_HEIGHT_PT / rowCount : 0;
+
         for (int r = 0; r <= lastRowNum; r++) {
             Row row = sheet.getRow(r);
-            html.append("<tr>");
+            if (forPdf && rowHeightPt > 0) {
+                html.append("<tr style=\"height:").append(String.format("%.1f", rowHeightPt)).append("pt\">");
+            } else {
+                html.append("<tr>");
+            }
             for (int c = 0; c < maxCols; c++) {
                 CellRangeAddress merge = findMergedRegion(mergedRegions, r, c);
                 if (merge != null) {
@@ -128,19 +180,26 @@ public class ProcessFileExcelToHtmlConverter {
                 String alignClass = "left";
                 String extraClass = "";
                 if (cell != null) {
-                    CellStyle style = cell.getCellStyle();
-                    HorizontalAlignment ha = style.getAlignment();
+                    CellStyle cellStyle = cell.getCellStyle();
+                    HorizontalAlignment ha = cellStyle.getAlignment();
                     if (ha == HorizontalAlignment.CENTER) alignClass = "center";
                     else if (ha == HorizontalAlignment.RIGHT) alignClass = "right";
-                    if (style.getRotation() != 0) extraClass = " vertical";
+                    if (!forPdf && cellStyle.getRotation() != 0) extraClass = " vertical";
                 }
+
+                String imgKey = r + "_" + c;
+                boolean isSealCell = sealImageData != null && r == SEAL_ROW1 && c == SEAL_COL1;
+                String cellClasses = alignClass + " " + extraClass + " wrap" + (isSealCell ? " pf-seal-cell" : "");
 
                 html.append("<td");
                 if (colspan > 1) html.append(" colspan=\"").append(colspan).append("\"");
                 if (rowspan > 1) html.append(" rowspan=\"").append(rowspan).append("\"");
-                html.append(" class=\"").append(alignClass).append(extraClass).append(" wrap\">");
+                html.append(" class=\"").append(cellClasses.trim()).append("\">");
 
-                String imgKey = r + "_" + c;
+                if (isSealCell) {
+                    html.append("<div class=\"pf-seal-overlay\"><img class=\"pf-seal-img\" src=\"")
+                        .append(sealImageData).append("\" alt=\"受控章\" /></div>");
+                }
                 if (cellImages.containsKey(imgKey)) {
                     html.append("<img src=\"").append(cellImages.get(imgKey)).append("\" alt=\"\" />");
                 }
@@ -150,20 +209,7 @@ public class ProcessFileExcelToHtmlConverter {
             html.append("</tr>");
         }
 
-        html.append("</table>");
-        if (sealImageData != null) {
-            double leftPct = 100.0 * SEAL_COL1 / maxCols;
-            double topPct = lastRowNum > 0 ? 100.0 * SEAL_ROW1 / (lastRowNum + 1) : 0;
-            double widthPct = 100.0 * (SEAL_COL2 - SEAL_COL1 + 1) / maxCols;
-            double heightPct = lastRowNum > 0 ? 100.0 * (SEAL_ROW2 - SEAL_ROW1 + 1) / (lastRowNum + 1) : 10;
-            html.append("<div class=\"pf-seal-overlay\" style=\"left:")
-                .append(String.format("%.1f", leftPct)).append("%;top:")
-                .append(String.format("%.1f", topPct)).append("%;width:")
-                .append(String.format("%.1f", widthPct)).append("%;height:")
-                .append(String.format("%.1f", heightPct)).append("%;\">")
-                .append("<img class=\"pf-seal-img\" src=\"").append(sealImageData).append("\" alt=\"受控章\" /></div>");
-        }
-        html.append("</div></body></html>");
+        html.append("</table></div></body></html>");
         return html.toString();
     }
 

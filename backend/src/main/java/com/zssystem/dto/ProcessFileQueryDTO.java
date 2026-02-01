@@ -15,6 +15,8 @@ public class ProcessFileQueryDTO {
     private String creatorName;
     private Integer version;
     private Integer isCurrent;
+    /** 启用状态：1-启用，0-搁置 */
+    private Integer enabled;
     private Integer pageNum = 1;
     private Integer pageSize = 10;
 }

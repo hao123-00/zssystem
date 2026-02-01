@@ -149,4 +149,20 @@ public class EquipmentCheckServiceImpl implements EquipmentCheckService {
         );
         return com.zssystem.util.EquipmentCheckExcelGenerator.generate(equipment, checkMonth, records);
     }
+
+    @Override
+    public String getPreviewHtml(Long equipmentId, String checkMonth) throws IOException {
+        byte[] excelBytes = exportCheckExcel(equipmentId, checkMonth);
+        try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(excelBytes)) {
+            return com.zssystem.util.EquipmentCheckExcelToHtmlConverter.convertToHtml(bais);
+        }
+    }
+
+    @Override
+    public String getPreviewHtmlForPdf(Long equipmentId, String checkMonth) throws IOException {
+        byte[] excelBytes = exportCheckExcel(equipmentId, checkMonth);
+        try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(excelBytes)) {
+            return com.zssystem.util.EquipmentCheckExcelToHtmlConverter.convertToHtmlForPdf(bais);
+        }
+    }
 }

@@ -30,6 +30,8 @@ import {
   downloadProcessFile,
   approveProcessFile,
   uploadSignature,
+  enableProcessFile,
+  archiveProcessFile,
 } from '@/api/processFile';
 import type { ProcessFileInfo } from '@/api/processFile';
 import SignaturePad from '@/components/SignaturePad/SignaturePad';
@@ -136,6 +138,28 @@ const ProcessFileDetail: React.FC = () => {
   const handlePreview = () => {
     if (!fileDetail) return;
     setPreviewVisible(true);
+  };
+
+  const handleEnable = async () => {
+    if (!fileDetail) return;
+    try {
+      await enableProcessFile(fileDetail.id);
+      message.success('已启用');
+      fetchDetail();
+    } catch (error: any) {
+      message.error(error.message || '启用失败');
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!fileDetail) return;
+    try {
+      await archiveProcessFile(fileDetail.id);
+      message.success('已设为备用');
+      fetchDetail();
+    } catch (error: any) {
+      message.error(error.message || '设为备用失败');
+    }
   };
 
   const handleApprove = async () => {
@@ -249,6 +273,20 @@ const ProcessFileDetail: React.FC = () => {
                 审批
               </Button>
             )}
+            {fileDetail.status === 5 && fileDetail.enabled !== 1 && (
+              <Button
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                onClick={handleEnable}
+              >
+                启用
+              </Button>
+            )}
+            {fileDetail.status === 5 && fileDetail.enabled === 1 && (
+              <Button onClick={handleArchive}>
+                备用
+              </Button>
+            )}
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/production/process-file')}>
               返回列表
             </Button>
@@ -261,6 +299,11 @@ const ProcessFileDetail: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="状态">
             {getStatusTag(fileDetail.status)}
+          </Descriptions.Item>
+          <Descriptions.Item label="启用状态">
+            <Tag color={fileDetail.enabled === 1 ? 'green' : 'default'}>
+              {fileDetail.enabledText || '备用'}
+            </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="设备编号">
             {fileDetail.equipmentNo}

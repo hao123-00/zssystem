@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
@@ -68,6 +69,21 @@ public class EquipmentCheckController {
             return ResponseEntity.ok().headers(headers).body(bytes);
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage() != null ? e.getMessage() : "导出失败", e);
+        }
+    }
+
+    /**
+     * 预览某设备某月30天点检表（HTML，效果与下载 Excel 一致）
+     */
+    @GetMapping("/export/preview")
+    public Result<String> previewCheckExcel(
+            @RequestParam Long equipmentId,
+            @RequestParam String checkMonth) {
+        try {
+            String html = checkService.getPreviewHtml(equipmentId, checkMonth);
+            return Result.success(html);
+        } catch (IOException e) {
+            return Result.error(e.getMessage() != null ? e.getMessage() : "预览失败");
         }
     }
 }

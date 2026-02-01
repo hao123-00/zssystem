@@ -9,6 +9,7 @@ import {
   EquipmentCheckQueryParams,
 } from '@/api/equipment';
 import CheckModal from './CheckModal';
+import EquipmentCheckPreview from '@/components/EquipmentCheckPreview/EquipmentCheckPreview';
 import { getEquipmentList } from '@/api/equipment';
 import { useResponsive } from '@/hooks/useResponsive';
 import { ResponsiveSearch } from '@/components/ResponsiveSearch';
@@ -31,6 +32,7 @@ const CheckList: React.FC = () => {
   const [exportEquipmentId, setExportEquipmentId] = useState<number | undefined>();
   const [exportMonth, setExportMonth] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const { isMobile } = useResponsive();
 
   useEffect(() => {
@@ -106,6 +108,18 @@ const CheckList: React.FC = () => {
     setExportModalVisible(true);
     setExportEquipmentId(undefined);
     setExportMonth(null);
+  };
+
+  const handlePreview = () => {
+    if (exportEquipmentId == null) {
+      message.warning('请选择设备');
+      return;
+    }
+    if (!exportMonth) {
+      message.warning('请选择月份');
+      return;
+    }
+    setPreviewVisible(true);
   };
 
   const handleExportOk = async () => {
@@ -449,9 +463,17 @@ const CheckList: React.FC = () => {
         title="导出30天点检表"
         open={exportModalVisible}
         onCancel={() => setExportModalVisible(false)}
-        onOk={handleExportOk}
-        confirmLoading={exporting}
-        okText="导出"
+        footer={[
+          <Button key="cancel" onClick={() => setExportModalVisible(false)}>
+            取消
+          </Button>,
+          <Button key="preview" onClick={handlePreview}>
+            预览
+          </Button>,
+          <Button key="export" type="primary" loading={exporting} onClick={handleExportOk}>
+            导出
+          </Button>,
+        ]}
       >
         <Form layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item label="选择设备" required>
@@ -480,6 +502,14 @@ const CheckList: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <EquipmentCheckPreview
+        visible={previewVisible}
+        onClose={() => setPreviewVisible(false)}
+        equipmentId={exportEquipmentId ?? 0}
+        checkMonth={exportMonth ? exportMonth.format('YYYY-MM') : ''}
+        title={`点检表预览 - ${exportMonth ? exportMonth.format('YYYY-MM') : ''}`}
+      />
     </div>
   );
 };

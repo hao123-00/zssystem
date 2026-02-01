@@ -5,11 +5,15 @@ import com.zssystem.common.PageResult;
 import com.zssystem.common.Result;
 import com.zssystem.dto.EquipmentQueryDTO;
 import com.zssystem.dto.EquipmentSaveDTO;
+import com.zssystem.service.EquipmentQrService;
 import com.zssystem.service.EquipmentService;
 import com.zssystem.vo.EquipmentVO;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,6 +23,9 @@ public class EquipmentController {
 
     @Autowired
     private EquipmentService equipmentService;
+
+    @Autowired
+    private EquipmentQrService equipmentQrService;
 
     @GetMapping("/list")
     public Result<PageResult<EquipmentVO>> getEquipmentList(@Validated EquipmentQueryDTO queryDTO) {
@@ -54,5 +61,20 @@ public class EquipmentController {
     public Result<Void> deleteEquipment(@PathVariable Long id) {
         equipmentService.deleteEquipment(id);
         return Result.success();
+    }
+
+    /**
+     * 获取设备二维码图片（用于打印张贴，扫码后可查看点检记录和工艺卡）
+     */
+    @GetMapping("/{id}/qrcode")
+    public ResponseEntity<byte[]> getEquipmentQrCode(@PathVariable Long id) {
+        try {
+            byte[] png = equipmentQrService.generateQrCodePng(id);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.IMAGE_PNG);
+            return ResponseEntity.ok().headers(headers).body(png);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 }

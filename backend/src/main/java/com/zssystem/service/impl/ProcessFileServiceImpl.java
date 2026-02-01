@@ -51,6 +51,9 @@ public class ProcessFileServiceImpl implements ProcessFileService {
     @Autowired
     private com.zssystem.mapper.ProcessFileDetailMapper processFileDetailMapper;
     
+    @Autowired
+    private com.zssystem.mapper.ProcessFileSignatureMapper processFileSignatureMapper;
+    
     @Autowired(required = false)
     private com.zssystem.service.ProcessFileSignatureService signatureService;
     
@@ -91,6 +94,7 @@ public class ProcessFileServiceImpl implements ProcessFileService {
                .like(queryDTO.getCreatorName() != null, ProcessFile::getCreatorName, queryDTO.getCreatorName())
                .eq(queryDTO.getVersion() != null, ProcessFile::getVersion, queryDTO.getVersion())
                .eq(queryDTO.getIsCurrent() != null, ProcessFile::getIsCurrent, queryDTO.getIsCurrent())
+               .eq(queryDTO.getEnabled() != null, ProcessFile::getEnabled, queryDTO.getEnabled())
                .orderByDesc(ProcessFile::getCreateTime);
         
         IPage<ProcessFile> filePage = processFileMapper.selectPage(page, wrapper);
@@ -439,7 +443,51 @@ public class ProcessFileServiceImpl implements ProcessFileService {
         
         processFile.setStatus(-2); // 已作废
         processFile.setInvalidTime(LocalDateTime.now());
+        processFile.setEnabled(0); // 作废时设为搁置
         processFileMapper.updateById(processFile);
+    }
+    
+    @Override
+    @Transactional
+    public void deleteProcessFilePhysical(Long fileId) {
+        ProcessFile processFile = processFileMapper.selectById(fileId);
+        if (processFile == null) {
+            throw new RuntimeException("工艺文件不存在");
+        }
+        
+        // 1. 删除关联数据（物理删除）
+        processFileDetailMapper.deletePhysicalByFileId(fileId);
+        processFileSignatureMapper.deletePhysicalByFileId(fileId);
+        approvalMapper.delete(new LambdaQueryWrapper<ProcessFileApproval>().eq(ProcessFileApproval::getFileId, fileId));
+        sealMapper.delete(new LambdaQueryWrapper<ProcessFileSeal>().eq(ProcessFileSeal::getFileId, fileId));
+        
+        // 2. 删除磁盘上的Excel文件（如存在）
+        String filePath = processFile.getFilePath();
+        if (filePath != null && !filePath.isEmpty()) {
+            try {
+                com.zssystem.util.FileUtil.deleteFile(filePath);
+            } catch (Exception e) {
+                System.err.println("删除Excel文件失败: " + filePath + ", " + e.getMessage());
+            }
+        }
+        
+        // 3. 物理删除主表
+        processFileMapper.deletePhysicalById(fileId);
+    }
+    
+    @Override
+    @Transactional
+    public int batchDeleteByEquipmentIdPhysical(Long equipmentId) {
+        if (equipmentId == null) {
+            throw new RuntimeException("请选择设备（机台）");
+        }
+        List<ProcessFile> list = processFileMapper.selectList(
+            new LambdaQueryWrapper<ProcessFile>().eq(ProcessFile::getEquipmentId, equipmentId)
+        );
+        for (ProcessFile pf : list) {
+            deleteProcessFilePhysical(pf.getId());
+        }
+        return list.size();
     }
     
     @Override
@@ -457,9 +505,49 @@ public class ProcessFileServiceImpl implements ProcessFileService {
         for (ProcessFile pf : list) {
             pf.setStatus(-2);
             pf.setInvalidTime(now);
+            pf.setEnabled(0);
             processFileMapper.updateById(pf);
         }
         return list.size();
+    }
+    
+    @Override
+    @Transactional
+    public void setEnabled(Long fileId) {
+        ProcessFile processFile = processFileMapper.selectById(fileId);
+        if (processFile == null) {
+            throw new RuntimeException("工艺文件不存在");
+        }
+        String machineNo = processFile.getMachineNo();
+        if (machineNo == null || machineNo.isEmpty()) {
+            throw new RuntimeException("该工艺文件未关联机台号，无法启用");
+        }
+        
+        // 同机台号的其他工艺文件设为搁置
+        List<ProcessFile> others = processFileMapper.selectList(
+            new LambdaQueryWrapper<ProcessFile>()
+                .eq(ProcessFile::getMachineNo, machineNo)
+                .ne(ProcessFile::getId, fileId)
+        );
+        for (ProcessFile pf : others) {
+            pf.setEnabled(0);
+            processFileMapper.updateById(pf);
+        }
+        
+        // 当前工艺文件设为启用
+        processFile.setEnabled(1);
+        processFileMapper.updateById(processFile);
+    }
+    
+    @Override
+    @Transactional
+    public void setArchived(Long fileId) {
+        ProcessFile processFile = processFileMapper.selectById(fileId);
+        if (processFile == null) {
+            throw new RuntimeException("工艺文件不存在");
+        }
+        processFile.setEnabled(0);
+        processFileMapper.updateById(processFile);
     }
     
     @Override
@@ -474,6 +562,12 @@ public class ProcessFileServiceImpl implements ProcessFileService {
     public String getPreviewHtml(Long fileId) throws IOException {
         String excelFilePath = ensureExcelReadyAndGetPath(fileId);
         return com.zssystem.util.ProcessFileExcelToHtmlConverter.convertToHtml(excelFilePath);
+    }
+
+    @Override
+    public String getPreviewHtmlForPdf(Long fileId) throws IOException {
+        String excelFilePath = ensureExcelReadyAndGetPath(fileId);
+        return com.zssystem.util.ProcessFileExcelToHtmlConverter.convertToHtmlForPdf(excelFilePath);
     }
 
     /**
@@ -800,6 +894,9 @@ public class ProcessFileServiceImpl implements ProcessFileService {
         
         // 状态文本
         vo.setStatusText(STATUS_MAP.getOrDefault(file.getStatus(), "未知"));
+        
+        // 启用状态文本
+        vo.setEnabledText(Integer.valueOf(1).equals(file.getEnabled()) ? "启用" : "备用");
         
         return vo;
     }

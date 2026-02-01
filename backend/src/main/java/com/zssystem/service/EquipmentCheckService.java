@@ -17,4 +17,14 @@ public interface EquipmentCheckService {
      * @return Excel 文件字节
      */
     byte[] exportCheckExcel(Long equipmentId, String checkMonth) throws java.io.IOException;
+
+    /**
+     * 获取某设备某月30天点检表 HTML 预览（效果与下载 Excel 一致）
+     */
+    String getPreviewHtml(Long equipmentId, String checkMonth) throws java.io.IOException;
+
+    /**
+     * 获取点检表 HTML（PDF 用，√ × 使用 SVG 与 Excel 样式一致）
+     */
+    String getPreviewHtmlForPdf(Long equipmentId, String checkMonth) throws java.io.IOException;
 }

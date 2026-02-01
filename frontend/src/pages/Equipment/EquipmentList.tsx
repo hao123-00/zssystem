@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Button, Form, Input, Select, Space, message, Popconfirm, Tag, Modal } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, QrcodeOutlined } from '@ant-design/icons';
 import {
   getEquipmentList,
   deleteEquipment,
+  getEquipmentQrCodeImage,
   EquipmentInfo,
   EquipmentQueryParams,
 } from '@/api/equipment';
@@ -24,6 +25,10 @@ const EquipmentList: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<EquipmentInfo | null>(null);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [qrEquipment, setQrEquipment] = useState<EquipmentInfo | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState<string>('');
+  const [qrLoading, setQrLoading] = useState(false);
   const { isMobile } = useResponsive();
 
   const fetchList = async () => {
@@ -84,6 +89,32 @@ const EquipmentList: React.FC = () => {
     setPagination({ ...pagination, current: page, pageSize });
   };
 
+  const handleShowQrCode = async (equipment: EquipmentInfo) => {
+    setQrEquipment(equipment);
+    setQrModalVisible(true);
+    setQrImageUrl('');
+    setQrLoading(true);
+    try {
+      const res = await getEquipmentQrCodeImage(equipment.id);
+      const blob = res?.data instanceof Blob ? res.data : new Blob([res?.data ?? []]);
+      const url = URL.createObjectURL(blob);
+      setQrImageUrl(url);
+    } catch (e: any) {
+      message.error(e.message || '加载二维码失败');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleCloseQrModal = () => {
+    setQrModalVisible(false);
+    setQrEquipment(null);
+    if (qrImageUrl) {
+      URL.revokeObjectURL(qrImageUrl);
+      setQrImageUrl('');
+    }
+  };
+
   const renderStatus = (status: number) => {
     const statusMap: Record<number, { text: string; color: string }> = {
       0: { text: '停用', color: 'default' },
@@ -135,10 +166,13 @@ const EquipmentList: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 220,
       fixed: 'right' as const,
       render: (_: any, record: EquipmentInfo) => (
         <Space>
+          <Button type="link" icon={<QrcodeOutlined />} onClick={() => handleShowQrCode(record)}>
+            二维码
+          </Button>
           <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
@@ -167,6 +201,12 @@ const EquipmentList: React.FC = () => {
 
   // 移动端操作按钮配置
   const mobileActions: ActionConfig[] = [
+    {
+      key: 'qrcode',
+      label: '二维码',
+      icon: <QrcodeOutlined />,
+      onClick: (record) => handleShowQrCode(record),
+    },
     {
       key: 'edit',
       label: '编辑',
@@ -253,6 +293,30 @@ const EquipmentList: React.FC = () => {
           fetchList();
         }}
       />
+
+      <Modal
+        title={`设备二维码 - ${qrEquipment?.equipmentName || qrEquipment?.equipmentNo || ''}`}
+        open={qrModalVisible}
+        onCancel={handleCloseQrModal}
+        footer={null}
+        destroyOnClose
+      >
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          {qrLoading ? (
+            <div style={{ padding: 40 }}>加载中...</div>
+          ) : qrImageUrl ? (
+            <>
+              <img src={qrImageUrl} alt="二维码" style={{ maxWidth: '100%', maxHeight: 300 }} />
+              <p style={{ marginTop: 12, color: '#666', fontSize: 13 }}>
+                微信扫描此二维码可查看点检记录及启用的工艺卡
+              </p>
+              <p style={{ color: '#999', fontSize: 12 }}>
+                建议打印后张贴在对应机台
+              </p>
+            </>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 };

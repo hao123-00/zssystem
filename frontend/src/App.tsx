@@ -17,11 +17,13 @@ import ProcessFileDetail from './pages/Production/ProcessFile/ProcessFileDetail'
 import PendingApprovalList from './pages/Production/ProcessFile/PendingApprovalList';
 import EquipmentManagement from './pages/Equipment/EquipmentManagement';
 import Site5sManagement from './pages/Site5s/Site5sManagement';
+import EquipmentQrView from './pages/Qr/EquipmentQrView';
 
 const App: React.FC = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/qr/equipment/:equipmentId" element={<EquipmentQrView />} />
       <Route
         path="/"
         element={

@@ -41,6 +41,9 @@ public class ProcessFileVO {
     
     private String sealImagePath;
     private Integer isCurrent;
+    /** 启用状态：1-启用，0-搁置 */
+    private Integer enabled;
+    private String enabledText;
     private Long parentFileId;
     private String changeReason;
     private String remark;

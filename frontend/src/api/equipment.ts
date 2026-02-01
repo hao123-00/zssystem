@@ -282,6 +282,39 @@ export const exportCheckExcel = (equipmentId: number, checkMonth: string) => {
   });
 };
 
+/**
+ * 获取某设备某月30天点检表 HTML 预览（效果与下载 Excel 一致）
+ */
+export const getEquipmentCheckPreviewHtml = (equipmentId: number, checkMonth: string) => {
+  return request.get<string>('/equipment/check/export/preview', {
+    params: { equipmentId, checkMonth },
+  });
+};
+
+// ========== 设备扫码查看（公开接口，无需登录） ==========
+export interface EquipmentQrViewData {
+  equipment: { id: number; equipmentNo: string; equipmentName: string; machineNo: string };
+  checkRecords: EquipmentCheckInfo[];
+  enabledProcessFile: { id: number; fileNo: string; fileName: string; versionText: string } | null;
+  checkMonth: string;
+}
+
+export const getEquipmentQrViewData = (equipmentId: number) => {
+  return request.get<EquipmentQrViewData>(`/qr/equipment/${equipmentId}/view`);
+};
+
+export const getEquipmentQrCheckPreviewHtml = (equipmentId: number) => {
+  return request.get<string>(`/qr/equipment/${equipmentId}/check/preview`);
+};
+
+export const getEquipmentQrProcessFilePreviewHtml = (equipmentId: number) => {
+  return request.get<string>(`/qr/equipment/${equipmentId}/process-file/preview`);
+};
+
+export const getEquipmentQrCodeImage = (equipmentId: number) => {
+  return request.get(`/equipment/${equipmentId}/qrcode`, { responseType: 'blob' });
+};
+
 // ========== 设备维护 API ==========
 export const getMaintenanceList = (params: EquipmentMaintenanceQueryParams) => {
   return request.get<{

@@ -362,22 +362,20 @@ public class ProcessFileController {
     }
 
     /**
-     * 删除工艺文件（作废）
+     * 物理删除工艺文件
      */
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         Long currentUserId = SecurityUtil.getCurrentUserId();
-        
         if (currentUserId == null) {
             return Result.error("用户未登录");
         }
-        
-        processFileService.invalidateProcessFile(id, currentUserId);
+        processFileService.deleteProcessFilePhysical(id);
         return Result.success();
     }
     
     /**
-     * 按机台号（设备）批量删除工艺文件（作废该设备下所有工艺文件）
+     * 按机台号（设备）批量物理删除工艺文件
      */
     @PostMapping("/batch-delete-by-equipment")
     public Result<Integer> batchDeleteByEquipment(@RequestParam Long equipmentId) {
@@ -385,8 +383,34 @@ public class ProcessFileController {
         if (currentUserId == null) {
             return Result.error("用户未登录");
         }
-        int count = processFileService.batchInvalidateByEquipmentId(equipmentId, currentUserId);
+        int count = processFileService.batchDeleteByEquipmentIdPhysical(equipmentId);
         return Result.success(count);
+    }
+    
+    /**
+     * 启用工艺文件（同机台号其他工艺文件自动设为搁置）
+     */
+    @PostMapping("/{id}/enable")
+    public Result<Void> enable(@PathVariable Long id) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        processFileService.setEnabled(id);
+        return Result.success();
+    }
+    
+    /**
+     * 搁置工艺文件
+     */
+    @PostMapping("/{id}/archive")
+    public Result<Void> archive(@PathVariable Long id) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        if (currentUserId == null) {
+            return Result.error("用户未登录");
+        }
+        processFileService.setArchived(id);
+        return Result.success();
     }
     
     /**

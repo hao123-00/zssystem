@@ -9,6 +9,7 @@ export interface ProcessFileQueryParams {
   machineNo?: string;
   fileName?: string;
   status?: number;
+  enabled?: number;
   creatorName?: string;
   version?: number;
   isCurrent?: number;
@@ -54,6 +55,8 @@ export interface ProcessFileInfo {
   versionText: string;
   status: number;
   statusText: string;
+  enabled?: number;
+  enabledText?: string;
   creatorId: number;
   creatorName: string;
   submitTime: string;
@@ -248,20 +251,34 @@ export const getPendingApprovalFiles = (pageNum: number, pageSize: number) => {
 };
 
 /**
- * 删除工艺文件（作废）
+ * 物理删除工艺文件
  */
 export const deleteProcessFile = (id: number) => {
   return request.delete(`/production/process-file/${id}`);
 };
 
 /**
- * 按机台号（设备）批量删除工艺文件（作废该设备下所有工艺文件）
- * @returns 作废的数量
+ * 按机台号（设备）批量物理删除工艺文件
+ * @returns 删除的数量
  */
 export const batchDeleteProcessFileByEquipment = (equipmentId: number) => {
   return request.post<number>('/production/process-file/batch-delete-by-equipment', null, {
     params: { equipmentId },
   });
+};
+
+/**
+ * 启用工艺文件（同机台号其他工艺文件自动设为备用）
+ */
+export const enableProcessFile = (id: number) => {
+  return request.post(`/production/process-file/${id}/enable`);
+};
+
+/**
+ * 备用工艺文件
+ */
+export const archiveProcessFile = (id: number) => {
+  return request.post(`/production/process-file/${id}/archive`);
 };
 
 /**
