@@ -104,30 +104,48 @@ const UserList: React.FC = () => {
     fetchList();
   };
 
-  // PC 端表格列配置
+  // PC 端表格列配置：工号、姓名、班组、岗位、类别、入职日期
   const columns = [
+    {
+      title: '工号',
+      dataIndex: 'employeeNo',
+      key: 'employeeNo',
+      width: 100,
+    },
+    {
+      title: '姓名',
+      dataIndex: 'name',
+      key: 'name',
+      width: 100,
+    },
+    {
+      title: '班组',
+      dataIndex: 'team',
+      key: 'team',
+      width: 100,
+    },
+    {
+      title: '岗位',
+      dataIndex: 'position',
+      key: 'position',
+      width: 100,
+    },
+    {
+      title: '类别',
+      dataIndex: 'category',
+      key: 'category',
+      width: 100,
+    },
+    {
+      title: '入职日期',
+      dataIndex: 'hireDate',
+      key: 'hireDate',
+      width: 110,
+    },
     {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
-      width: 150,
-    },
-    {
-      title: '真实姓名',
-      dataIndex: 'name',
-      key: 'name',
-      width: 120,
-    },
-    {
-      title: '邮箱',
-      dataIndex: 'email',
-      key: 'email',
-      width: 180,
-    },
-    {
-      title: '手机号',
-      dataIndex: 'phone',
-      key: 'phone',
       width: 120,
     },
     {
@@ -157,12 +175,6 @@ const UserList: React.FC = () => {
         }
         return '-';
       },
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
-      width: 180,
     },
     {
       title: '操作',
@@ -206,6 +218,11 @@ const UserList: React.FC = () => {
 
   // 移动端卡片字段配置
   const mobileFields: FieldConfig[] = [
+    { key: 'employeeNo', label: '工号' },
+    { key: 'team', label: '班组' },
+    { key: 'position', label: '岗位' },
+    { key: 'category', label: '类别' },
+    { key: 'hireDate', label: '入职日期' },
     { key: 'phone', label: '手机号' },
     { key: 'email', label: '邮箱' },
     {
@@ -294,7 +311,7 @@ const UserList: React.FC = () => {
           dataSource={tableData}
           loading={loading}
           rowKey="id"
-          titleField={{ key: 'username', label: '用户名' }}
+          titleField={{ key: 'employeeNo', label: '工号' }}
           subtitleField={{ key: 'name', label: '姓名' }}
           fields={mobileFields}
           actions={mobileActions}

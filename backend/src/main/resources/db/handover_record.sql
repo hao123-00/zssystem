@@ -1,0 +1,28 @@
+-- 交接班记录表
+CREATE TABLE IF NOT EXISTS `handover_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `equipment_id` bigint NOT NULL COMMENT '设备ID',
+  `equipment_no` varchar(50) NOT NULL COMMENT '设备编号',
+  `record_date` date NOT NULL COMMENT '记录日期',
+  `shift` varchar(20) DEFAULT NULL COMMENT '班次',
+  `product_name` varchar(100) DEFAULT NULL COMMENT '产品名称',
+  `material` varchar(100) DEFAULT NULL COMMENT '材质',
+  `equipment_cleaning` varchar(50) DEFAULT NULL COMMENT '设备清洁：√正常/异常原因/△修理/○停机/▲修复',
+  `floor_cleaning` varchar(50) DEFAULT NULL COMMENT '地面清洁',
+  `leakage` varchar(50) DEFAULT NULL COMMENT '有无漏油',
+  `item_placement` varchar(50) DEFAULT NULL COMMENT '物品摆放',
+  `injection_machine` varchar(50) DEFAULT NULL COMMENT '注塑机',
+  `robot` varchar(50) DEFAULT NULL COMMENT '机械手',
+  `assembly_line` varchar(50) DEFAULT NULL COMMENT '流水线',
+  `mold` varchar(50) DEFAULT NULL COMMENT '模具',
+  `process` varchar(200) DEFAULT NULL COMMENT '工艺',
+  `handover_leader` varchar(50) DEFAULT NULL COMMENT '交接组长',
+  `receiving_leader` varchar(50) DEFAULT NULL COMMENT '接班组长',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint DEFAULT 0 COMMENT '删除标志：0-未删除，1-已删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_equipment_id` (`equipment_id`),
+  KEY `idx_record_date` (`record_date`),
+  KEY `idx_equipment_month` (`equipment_id`, `record_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='交接班记录表';

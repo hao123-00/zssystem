@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: zssystem-backend
+  servlet:
+    multipart:
+      max-file-size: 10MB      # 单文件最大 10MB，手机拍照通常 2-5MB
+      max-request-size: 10MB   # 请求体最大 10MB
   # DevTools 热部署配置
   devtools:
     restart:
@@ -71,6 +75,8 @@ qr:
 file:
   upload:
     path: /Users/czd/zssystem/uploads/process-files
+    handover-photos: /Users/czd/zssystem/uploads/handover-photos  # 交接班拍照，15天后自动删除
+    site5s-area-photos: /Users/czd/zssystem/uploads/site5s-area   # 5S区域拍照
     max-size: 10485760  # 10MB
 
 # 日志配置

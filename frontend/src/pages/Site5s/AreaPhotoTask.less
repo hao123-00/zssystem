@@ -1,0 +1,43 @@
+.area-photo-task {
+  .task-header {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .area-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .area-card {
+    .area-slots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .area-slot {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px dashed #d9d9d9;
+      border-radius: 4px;
+      background: #fafafa;
+
+      &.area-slot-done {
+        border-style: solid;
+        border-color: #d9d9d9;
+        background: #f6ffed;
+      }
+
+      .slot-uploader {
+        font-size: 12px;
+        color: #999;
+      }
+    }
+  }
+}

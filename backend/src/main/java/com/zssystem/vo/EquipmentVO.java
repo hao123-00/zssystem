@@ -24,6 +24,7 @@ public class EquipmentVO {
     private String spareMold1;
     private String spareMold2;
     private String spareMold3;
+    private String basicMold4;
     private Integer status;
     private String statusText; // 状态文本：停用、正常、维修中
     private String remark;

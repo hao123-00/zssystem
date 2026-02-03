@@ -24,8 +24,8 @@ const EquipmentQrView: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'process' && equipmentId && data?.enabledProcessFile) {
       const baseURL = request.defaults.baseURL || '/api';
-      window.open(`${baseURL}/qr/equipment/${equipmentId}/process-file/pdf`, '_blank');
-      message.success('正在打开工艺卡PDF');
+      window.open(`${baseURL}/qr/equipment/${equipmentId}/process-file/svg`, '_blank');
+      message.success('正在打开工艺卡');
     }
   }, [activeTab, equipmentId, data?.enabledProcessFile]);
 
@@ -43,11 +43,18 @@ const EquipmentQrView: React.FC = () => {
     }
   };
 
-  const handleViewCheckPdf = () => {
+  const handleViewCheckSvg = () => {
     if (!equipmentId) return;
     const baseURL = request.defaults.baseURL || '/api';
-    window.open(`${baseURL}/qr/equipment/${equipmentId}/check/pdf`, '_blank');
-    message.success('正在打开PDF');
+    window.open(`${baseURL}/qr/equipment/${equipmentId}/check/svg`, '_blank');
+    message.success('正在打开点检表');
+  };
+
+  const handleViewHandoverSvg = () => {
+    if (!equipmentId) return;
+    const baseURL = request.defaults.baseURL || '/api';
+    window.open(`${baseURL}/qr/equipment/${equipmentId}/handover/svg`, '_blank');
+    message.success('正在打开交班记录表');
   };
 
   const renderCheckItem = (val: number | undefined) => {
@@ -119,9 +126,9 @@ const EquipmentQrView: React.FC = () => {
                   <Button
                     type="primary"
                     icon={<FilePdfOutlined />}
-                    onClick={handleViewCheckPdf}
+                    onClick={handleViewCheckSvg}
                   >
-                    查看点检表PDF
+                    查看点检表
                   </Button>
                 </div>
                 {data.checkRecords.length > 0 ? (
@@ -149,12 +156,32 @@ const EquipmentQrView: React.FC = () => {
                     <span>{data.enabledProcessFile.fileName}</span>
                     <Tag>{data.enabledProcessFile.versionText}</Tag>
                     <div style={{ marginTop: 12, color: '#666', fontSize: 14 }}>
-                      工艺卡PDF已在新窗口打开
+                      工艺卡已在新窗口打开
                     </div>
                   </div>
                 ) : (
                   <Empty description="该机台暂无启用的工艺卡" />
                 )}
+              </Card>
+            ),
+          },
+          {
+            key: 'handover',
+            label: '交班记录表',
+            children: (
+              <Card size="small">
+                <div style={{ marginBottom: 12 }}>
+                  <Button
+                    type="primary"
+                    icon={<FilePdfOutlined />}
+                    onClick={handleViewHandoverSvg}
+                  >
+                    查看交班记录表
+                  </Button>
+                </div>
+                <div style={{ color: '#666', fontSize: 14 }}>
+                  查看当月所有交接班记录，格式与导出 Excel 一致
+                </div>
               </Card>
             ),
           },

@@ -1,14 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Form, Input, Button, Checkbox, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { login, LoginParams } from '@/api/auth';
 import { setToken, setRefreshToken, setUserInfo, isAuthenticated } from '@/utils/auth';
+import bg1 from '@/assets/login/bg1.png';
+import bg2 from '@/assets/login/bg2.png';
 import './Login.less';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const [currentBg, setCurrentBg] = useState(0);
+  const backgrounds = [bg1, bg2];
 
   useEffect(() => {
     // 如果已登录，跳转到首页
@@ -16,6 +20,14 @@ const Login: React.FC = () => {
       navigate('/');
     }
   }, [navigate]);
+
+  useEffect(() => {
+    // 背景图片轮播
+    const timer = setInterval(() => {
+      setCurrentBg((prev) => (prev + 1) % backgrounds.length);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, []);
 
   const onFinish = async (values: LoginParams) => {
     try {
@@ -36,6 +48,13 @@ const Login: React.FC = () => {
 
   return (
     <div className="login-container">
+      {backgrounds.map((bg, index) => (
+        <div
+          key={index}
+          className={`login-bg-slide ${index === currentBg ? 'active' : ''}`}
+          style={{ backgroundImage: `url(${bg})` }}
+        />
+      ))}
       <div className="login-box">
         <h1 className="login-title">注塑部管理系统</h1>
         <Form

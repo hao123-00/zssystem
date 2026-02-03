@@ -10,6 +10,7 @@ import PermissionList from './pages/Permission/PermissionList';
 import EmployeeList from './pages/Employee/EmployeeList';
 import DepartmentList from './pages/Department/DepartmentList';
 import ProductionManagement from './pages/Production/ProductionManagement';
+import HandoverList from './pages/Production/HandoverList';
 import ProcessFileList from './pages/Production/ProcessFile';
 import ProcessFileUpload from './pages/Production/ProcessFile/ProcessFileUpload';
 import ProcessFileForm from './pages/Production/ProcessFile/ProcessFileForm';
@@ -39,6 +40,7 @@ const App: React.FC = () => {
         <Route path="employee" element={<EmployeeList />} />
         <Route path="department" element={<DepartmentList />} />
         <Route path="production" element={<ProductionManagement />} />
+        <Route path="production/handover" element={<HandoverList />} />
         <Route path="production/process-file" element={<ProcessFileList />} />
         <Route path="production/process-file/upload" element={<ProcessFileUpload />} />
         <Route path="production/process-file/upload/:id" element={<ProcessFileUpload />} />

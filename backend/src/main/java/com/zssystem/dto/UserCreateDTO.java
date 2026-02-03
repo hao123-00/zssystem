@@ -10,7 +10,6 @@ import lombok.Data;
 @Data
 public class UserCreateDTO {
     @NotBlank(message = "用户名不能为空")
-    @Size(min = 3, message = "用户名长度不能少于3位")
     private String username;
 
     @NotBlank(message = "密码不能为空")
@@ -25,6 +24,12 @@ public class UserCreateDTO {
 
     @Pattern(regexp = "^1[3-9]\\d{9}$", message = "请输入正确的手机号")
     private String phone;
+
+    private String employeeNo;
+    private String team;
+    private String position;
+    private String category;
+    private java.time.LocalDate hireDate;
 
     @NotNull(message = "状态不能为空")
     private Integer status;

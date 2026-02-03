@@ -3,6 +3,7 @@ package com.zssystem.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -21,6 +22,18 @@ public class SysUser {
     private String email;
 
     private String phone;
+
+    @TableField("employee_no")
+    private String employeeNo;
+
+    private String team;
+
+    private String position;
+
+    private String category;
+
+    @TableField("hire_date")
+    private LocalDate hireDate;
 
     private Integer status;
 

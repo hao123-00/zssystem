@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select, message } from 'antd';
+import { Modal, Form, Input, Select, DatePicker, message } from 'antd';
+import dayjs from 'dayjs';
 import { UserInfo, UserSaveParams, createUser, updateUser, getUserById } from '@/api/user';
 import { getAllRoles, RoleInfo } from '@/api/role';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -46,6 +47,7 @@ const UserModal: React.FC<UserModalProps> = ({ visible, user, onCancel, onSucces
       form.setFieldsValue({
         ...userDetail,
         realName: userDetail.name || userDetail.realName,
+        hireDate: userDetail.hireDate ? dayjs(userDetail.hireDate) : undefined,
         roleIds: userDetail.roles?.map((r) => r.id) || [],
       });
     } catch (error: any) {
@@ -60,6 +62,7 @@ const UserModal: React.FC<UserModalProps> = ({ visible, user, onCancel, onSucces
 
       const data: UserSaveParams = {
         ...values,
+        hireDate: values.hireDate ? values.hireDate.format('YYYY-MM-DD') : undefined,
       };
 
       if (user) {
@@ -106,10 +109,7 @@ const UserModal: React.FC<UserModalProps> = ({ visible, user, onCancel, onSucces
             <Form.Item
               name="username"
               label="用户名"
-              rules={[
-                { required: true, message: '请输入用户名' },
-                { min: 3, message: '用户名长度不能少于3位' },
-              ]}
+              rules={[{ required: true, message: '请输入用户名' }]}
             >
               <Input placeholder="请输入用户名" />
             </Form.Item>
@@ -142,6 +142,26 @@ const UserModal: React.FC<UserModalProps> = ({ visible, user, onCancel, onSucces
           rules={[{ required: true, message: '请输入真实姓名' }]}
         >
           <Input placeholder="请输入真实姓名" />
+        </Form.Item>
+
+        <Form.Item name="employeeNo" label="工号">
+          <Input placeholder="请输入工号" />
+        </Form.Item>
+
+        <Form.Item name="team" label="班组">
+          <Input placeholder="请输入班组" />
+        </Form.Item>
+
+        <Form.Item name="position" label="岗位">
+          <Input placeholder="请输入岗位" />
+        </Form.Item>
+
+        <Form.Item name="category" label="类别">
+          <Input placeholder="请输入类别" />
+        </Form.Item>
+
+        <Form.Item name="hireDate" label="入职日期">
+          <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} placeholder="请选择入职日期" />
         </Form.Item>
 
         <Form.Item

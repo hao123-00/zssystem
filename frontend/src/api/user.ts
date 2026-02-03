@@ -15,6 +15,11 @@ export interface UserSaveParams {
   realName: string;
   email?: string;
   phone?: string;
+  employeeNo?: string;
+  team?: string;
+  position?: string;
+  category?: string;
+  hireDate?: string;
   status: number;
   roleIds?: number[];
 }
@@ -26,6 +31,11 @@ export interface UserInfo {
   realName?: string;
   email?: string;
   phone?: string;
+  employeeNo?: string;
+  team?: string;
+  position?: string;
+  category?: string;
+  hireDate?: string;
   status: number;
   createTime: string;
   updateTime?: string;

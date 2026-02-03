@@ -13,6 +13,7 @@ import {
   Modal,
   Upload,
   Image,
+  AutoComplete,
 } from 'antd';
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd';
@@ -224,7 +225,17 @@ const ProcessFileForm: React.FC = () => {
                   label="产品名称"
                   name="productName"
                 >
-                  <Input placeholder="请输入产品名称" />
+                  <AutoComplete
+                    placeholder="请选择或输入产品名称"
+                    options={[
+                      { value: '电动剃须刀' },
+                      { value: '毛球修剪器' },
+                      { value: '鼻毛修剪器' },
+                      { value: '电动牙刷' },
+                      { value: '电动理发器' },
+                      { value: '加湿器' },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
               <Col span={8}>
@@ -287,7 +298,17 @@ const ProcessFileForm: React.FC = () => {
             <Row gutter={16}>
               <Col span={6}>
                 <Form.Item label="材料名称" name="materialName">
-                  <Input placeholder="请输入材料名称" />
+                  <AutoComplete
+                    placeholder="请选择或输入材料名称"
+                    options={[
+                      { value: 'ABS' },
+                      { value: 'PC' },
+                      { value: 'POM' },
+                      { value: '透明ABS' },
+                      { value: 'PA66' },
+                      { value: 'TPE' },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -754,7 +775,14 @@ const ProcessFileForm: React.FC = () => {
               </Col>
               <Col span={6}>
                 <Form.Item label="注射模式" name="injectionMode">
-                  <Input placeholder="请输入注射模式" />
+                  <AutoComplete
+                    placeholder="请选择或输入注射模式"
+                    options={[
+                      { value: '时间' },
+                      { value: '位置' },
+                      { value: '时间+位置' },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -768,13 +796,20 @@ const ProcessFileForm: React.FC = () => {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="座台方式" name="nozzleContactMethod">
-                  <Input placeholder="请输入座台方式" />
+                <Form.Item label="座台方式" name="nozzleContactMethod" initialValue="固定">
+                  <Input readOnly placeholder="固定" />
                 </Form.Item>
               </Col>
               <Col span={6}>
                 <Form.Item label="顶针模式" name="ejectionMode">
-                  <Input placeholder="请输入顶针模式" />
+                  <AutoComplete
+                    placeholder="请选择或输入顶针模式"
+                    options={[
+                      { value: '连续' },
+                      { value: '停留' },
+                      { value: '震动' },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -872,14 +907,15 @@ const ProcessFileForm: React.FC = () => {
               <Col span={12}>
                 <div style={{ fontWeight: 'bold', marginBottom: 8 }}>原材料干燥处理</div>
                 <Form.Item label="使用设备" name="dryingEquipment">
-                  <Input placeholder="请输入使用设备" />
+                  <AutoComplete
+                    placeholder="请选择或输入使用设备"
+                    options={[{ value: '热风干燥机' }]}
+                  />
                 </Form.Item>
                 <Form.Item label="盛料高度" name="materialFillHeight">
-                  <InputNumber
-                    placeholder="请输入盛料高度"
-                    min={0}
-                    precision={2}
-                    style={{ width: '100%' }}
+                  <AutoComplete
+                    placeholder="请选择或输入盛料高度"
+                    options={[{ value: '满桶' }]}
                   />
                 </Form.Item>
                 <Form.Item label="翻料时间" name="materialTurningTime">
@@ -891,15 +927,24 @@ const ProcessFileForm: React.FC = () => {
                   />
                 </Form.Item>
                 <Form.Item label="干燥温度" name="dryingTemp">
-                  <InputNumber
-                    placeholder="请输入干燥温度"
-                    min={0}
-                    precision={2}
-                    style={{ width: '100%' }}
+                  <AutoComplete
+                    placeholder="请选择或输入干燥温度"
+                    options={[
+                      { value: '60℃-70℃' },
+                      { value: '80℃-90℃' },
+                      { value: '120℃-130℃' },
+                    ]}
                   />
                 </Form.Item>
                 <Form.Item label="前模冷却" name="frontMoldCooling">
-                  <Input placeholder="请输入前模冷却" />
+                  <AutoComplete
+                    placeholder="请选择或输入前模冷却"
+                    options={[
+                      { value: '冷冻水' },
+                      { value: '普通水' },
+                      { value: '模温' },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -935,7 +980,14 @@ const ProcessFileForm: React.FC = () => {
                   />
                 </Form.Item>
                 <Form.Item label="后模冷却" name="rearMoldCooling">
-                  <Input placeholder="请输入后模冷却" />
+                  <AutoComplete
+                    placeholder="请选择或输入后模冷却"
+                    options={[
+                      { value: '冷冻水' },
+                      { value: '普通水' },
+                      { value: '模温' },
+                    ]}
+                  />
                 </Form.Item>
               </Col>
             </Row>

@@ -47,6 +47,7 @@ public class ProcessFileExcelGenerator {
         CellStyle headerStyle = createHeaderStyle(workbook);
         CellStyle labelStyle = createLabelStyle(workbook);
         CellStyle dataStyle = createDataStyle(workbook);
+        CellStyle dataStyleSmall = createDataStyleWithFontSize(workbook, (short) 9);
         CellStyle centerStyle = createCenterStyle(workbook);
         CellStyle verticalStyle = createVerticalStyle(workbook);
         CellStyle labelCenterStyle = createLabelCenterStyle(workbook);  // 居中标签样式
@@ -66,7 +67,7 @@ public class ProcessFileExcelGenerator {
         createProcessParametersRows(sheet, processFileDetail, equipment, labelStyle, dataStyle, centerStyle, verticalStyle, labelCenterStyle);
         
         // ========== Row 22-27: 原料干燥处理和零件后处理 ==========
-        createDryingAndProcessRows(sheet, processFileDetail, labelStyle, dataStyle, verticalStyle, labelCenterStyle, dataLeftStyle);
+        createDryingAndProcessRows(sheet, processFileDetail, labelStyle, dataStyle, dataStyleSmall, verticalStyle, labelCenterStyle, dataLeftStyle);
         
         // ========== Row 28-30: 签名和文件编号 ==========
         createSignatureAndFileNoRows(sheet, processFile, equipment, labelStyle, dataStyle, labelCenterStyle, dataLeftStyle);
@@ -786,7 +787,7 @@ public class ProcessFileExcelGenerator {
      * 严格按照拆分Excel-plus1.md的布局
      */
     private static void createDryingAndProcessRows(Sheet sheet, ProcessFileDetail detail,
-                                                   CellStyle labelStyle, CellStyle dataStyle, CellStyle verticalStyle, CellStyle labelCenterStyle, CellStyle dataLeftStyle) {
+                                                   CellStyle labelStyle, CellStyle dataStyle, CellStyle dataStyleSmall, CellStyle verticalStyle, CellStyle labelCenterStyle, CellStyle dataLeftStyle) {
         // Row 22
         Row row22 = sheet.createRow(21);
         // A22:A27 - 原料干燥处理（纵向排列，字符正常方向）
@@ -798,7 +799,7 @@ public class ProcessFileExcelGenerator {
         // B22 - 使用设备（标签）
         createLabelCell(row22, 1, "使用设备", labelStyle);
         // C22 - 空白单元格，数据填充到C22（后一个单元格）
-        createDataCell(row22, 2, detail.getDryingEquipment(), dataStyle);
+        createDataCell(row22, 2, detail.getDryingEquipment(), dataStyleSmall);
         
         // D22 - 零件后处理（标签）
         createLabelCell(row22, 3, "零件后处理", labelStyle);
@@ -832,7 +833,7 @@ public class ProcessFileExcelGenerator {
         // B23 - 盛料高度（标签）
         createLabelCell(row23, 1, "盛料高度", labelStyle);
         // C23 - 空白单元格，数据填充到C23（后一个单元格）
-        createDataCell(row23, 2, formatDecimal(detail.getMaterialFillHeight()), dataStyle);
+        createDataCell(row23, 2, detail.getMaterialFillHeight() != null ? detail.getMaterialFillHeight() : "", dataStyle);
         
         // D23 - 产品后处理（标签）
         createLabelCell(row23, 3, "产品后处理", labelStyle);
@@ -894,7 +895,7 @@ public class ProcessFileExcelGenerator {
         // B26 - 干燥温度（标签）
         createLabelCell(row26, 1, "干燥温度", labelStyle);
         // C26 - 空白单元格，数据填充到C26（后一个单元格）
-        createDataCell(row26, 2, formatCelsius(detail.getDryingTemp()), dataStyle);
+        createDataCell(row26, 2, detail.getDryingTemp() != null ? detail.getDryingTemp() : "", dataStyleSmall);
         
         // D26 - 干燥时间（标签）
         createLabelCell(row26, 3, "干燥时间", labelStyle);
@@ -1212,9 +1213,13 @@ public class ProcessFileExcelGenerator {
     }
     
     private static CellStyle createDataStyle(Workbook workbook) {
+        return createDataStyleWithFontSize(workbook, (short) 10);
+    }
+
+    private static CellStyle createDataStyleWithFontSize(Workbook workbook, short fontSize) {
         CellStyle style = workbook.createCellStyle();
         Font font = workbook.createFont();
-        font.setFontHeightInPoints((short) 10);
+        font.setFontHeightInPoints(fontSize);
         style.setFont(font);
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);

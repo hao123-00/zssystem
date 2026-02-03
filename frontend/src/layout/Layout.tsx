@@ -74,6 +74,10 @@ const Layout: React.FC = () => {
           key: '/production/process-file/pending-approval',
           label: '待我审批',
         },
+        {
+          key: '/production/handover',
+          label: '交接班记录',
+        },
       ],
     },
     {

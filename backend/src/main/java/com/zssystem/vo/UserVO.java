@@ -2,6 +2,7 @@ package com.zssystem.vo;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -12,6 +13,11 @@ public class UserVO {
     private String name;
     private String email;
     private String phone;
+    private String employeeNo;
+    private String team;
+    private String position;
+    private String category;
+    private LocalDate hireDate;
     private Integer status;
     private LocalDateTime lastLoginTime;
     private String lastLoginIp;

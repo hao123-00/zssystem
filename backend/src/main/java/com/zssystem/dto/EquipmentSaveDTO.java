@@ -43,6 +43,8 @@ public class EquipmentSaveDTO {
     
     private String spareMold3;
     
+    private String basicMold4;
+    
     private Integer status; // 0-停用，1-正常，2-维修中
     
     private String remark;

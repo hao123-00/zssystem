@@ -60,6 +60,9 @@ public class Equipment {
     @TableField("spare_mold3")
     private String spareMold3;
     
+    @TableField("basic_mold4")
+    private String basicMold4;
+    
     private Integer status; // 0-停用，1-正常，2-维修中
     
     private String remark;

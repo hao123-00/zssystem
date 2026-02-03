@@ -185,9 +185,9 @@ public class ProcessFileDetail {
     
     // 原材料干燥处理
     private String dryingEquipment;
-    private BigDecimal materialFillHeight;
+    private String materialFillHeight;
     private BigDecimal materialTurningTime;
-    private BigDecimal dryingTemp;
+    private String dryingTemp;
     private String frontMoldCooling;
     
     // 零件后处理

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.YearMonth;
 
 /**
  * 设备扫码查看 - 公开接口（微信扫码无需登录）
@@ -72,41 +73,63 @@ public class EquipmentQrController {
     }
 
     /**
-     * 获取设备当月点检表 PDF（公开，扫码后查看）
+     * 获取设备当月点检表 SVG（公开，扫码后查看）
      */
-    @GetMapping("/{equipmentId}/check/pdf")
-    public ResponseEntity<byte[]> getCheckPdf(@PathVariable Long equipmentId) {
+    @GetMapping("/{equipmentId}/check/svg")
+    public ResponseEntity<byte[]> getCheckSvg(@PathVariable Long equipmentId) {
         try {
-            byte[] pdf = equipmentQrService.getCheckPdf(equipmentId);
-            String fileName = "点检表_" + equipmentQrService.getViewData(equipmentId).getCheckMonth() + ".pdf";
+            byte[] svg = equipmentQrService.getCheckSvg(equipmentId);
+            String fileName = "点检表_" + equipmentQrService.getViewData(equipmentId).getCheckMonth() + ".svg";
             String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType("application/pdf"));
+            headers.setContentType(MediaType.parseMediaType("image/svg+xml"));
             headers.add("Content-Disposition", "inline; filename*=UTF-8''" + encoded);
-            return ResponseEntity.ok().headers(headers).body(pdf);
+            return ResponseEntity.ok().headers(headers).body(svg);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }
     }
 
     /**
-     * 获取设备启用的工艺卡 PDF（仅当该设备有启用工艺卡时，公开，扫码后查看）
+     * 获取设备启用的工艺卡 SVG（仅当该设备有启用工艺卡时，公开，扫码后查看）
      */
-    @GetMapping("/{equipmentId}/process-file/pdf")
-    public ResponseEntity<byte[]> getProcessFilePdf(@PathVariable Long equipmentId) {
+    @GetMapping("/{equipmentId}/process-file/svg")
+    public ResponseEntity<byte[]> getProcessFileSvg(@PathVariable Long equipmentId) {
         try {
             EquipmentQrViewVO data = equipmentQrService.getViewData(equipmentId);
             if (data.getEnabledProcessFile() == null) {
                 return ResponseEntity.badRequest().build();
             }
-            byte[] pdf = equipmentQrService.getProcessFilePdf(equipmentId);
+            byte[] svg = equipmentQrService.getProcessFileSvg(equipmentId);
             String fileName = (data.getEnabledProcessFile().getFileName() != null ? data.getEnabledProcessFile().getFileName() : "工艺卡")
-                    .replaceAll("\\.(xls|xlsx)?$", "") + ".pdf";
+                    .replaceAll("\\.(xls|xlsx)?$", "") + ".svg";
             String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
             HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType("application/pdf"));
+            headers.setContentType(MediaType.parseMediaType("image/svg+xml"));
             headers.add("Content-Disposition", "inline; filename*=UTF-8''" + encoded);
-            return ResponseEntity.ok().headers(headers).body(pdf);
+            return ResponseEntity.ok().headers(headers).body(svg);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * 获取设备当月交接班记录表 SVG（公开，扫码后查看，整月所有记录）
+     * @param month 月份 yyyy-MM，不传则默认当月
+     */
+    @GetMapping("/{equipmentId}/handover/svg")
+    public ResponseEntity<byte[]> getHandoverSvg(
+            @PathVariable Long equipmentId,
+            @RequestParam(required = false) String month) {
+        try {
+            String recordMonth = (month != null && !month.isBlank()) ? month : YearMonth.now().toString();
+            byte[] svg = equipmentQrService.getHandoverSvg(equipmentId, recordMonth);
+            String fileName = "交班记录表_" + recordMonth + ".svg";
+            String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("image/svg+xml"));
+            headers.add("Content-Disposition", "inline; filename*=UTF-8''" + encoded);
+            return ResponseEntity.ok().headers(headers).body(svg);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();
         }

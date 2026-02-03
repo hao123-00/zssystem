@@ -53,12 +53,15 @@ public class EquipmentCheckExcelGenerator {
         "冻水机制冷系统、交流接触器是否正常",
     };
 
-    /** 列数：分类(0) + 项目(1) + 30日(2-31) = 32 */
+    /** 列数：分类(0) + 项目(1-12 合并) + 30日(13-42) = 43。B列由12个列宽4字符的列合并而成，与下载Excel视觉效果一致 */
     private static final int COL_CATEGORY = 0;
-    private static final int COL_ITEM = 1;
-    private static final int COL_DAY_START = 2;
-    private static final int COL_DAY_END = 31;
-    private static final int TOTAL_COLS = 32;
+    private static final int COL_ITEM_FIRST = 1;
+    private static final int COL_ITEM_LAST = 12;
+    private static final int COL_DAY_START = 13;
+    private static final int COL_DAY_END = 42;
+    private static final int TOTAL_COLS = 43;
+    /** 单列宽度单位（1 单位 = 1/256 字符），4 字符 = 1024 */
+    private static final int WIDTH_4_CHARS = 1024;
 
     /** 第22行固定说明文字（Excel 1-based 第22行 = 0-based 第21行） */
     private static final String REMARK_ROW_FIXED_TEXT = "说明：以上点检项目正常的用\"√\"表示，不正常的用\"×\"表示并在备注栏内注明不正常原因。";
@@ -88,11 +91,13 @@ public class EquipmentCheckExcelGenerator {
 
             Sheet sheet = workbook.createSheet("点检表");
 
-            // 列宽：分类列、项目列较宽，日期列窄（便于一页打印）
+            // 列宽：分类列；B列由若干列宽4字符的列合并（每列1024）；日期列窄（便于一页打印）
             sheet.setColumnWidth(COL_CATEGORY, 2800);   // 分类
-            sheet.setColumnWidth(COL_ITEM, 12000);      // 项目
+            for (int c = COL_ITEM_FIRST; c <= COL_ITEM_LAST; c++) {
+                sheet.setColumnWidth(c, WIDTH_4_CHARS); // 项目区每列4字符
+            }
             for (int c = COL_DAY_START; c <= COL_DAY_END; c++) {
-                sheet.setColumnWidth(c, 1200);           // 每日列窄
+                sheet.setColumnWidth(c, 1200);          // 每日列窄
             }
 
             CellStyle titleStyle = createTitleStyle(workbook);
@@ -125,29 +130,28 @@ public class EquipmentCheckExcelGenerator {
             createCell(infoRow, 24, year + " 年" + month + "月 ", headerStyle);
             sheet.addMergedRegion(new CellRangeAddress(1, 1, 24, TOTAL_COLS - 1));
 
-            // ========== 第三行：A3-B4 合并为“项目”居中；日期(合并30列) ==========
+            // ========== 第三行：A3 与 B 列(1-12) 合并为“项目”居中；日期(合并30列) ==========
             Row dateRow = sheet.createRow(rowIdx++);
             createCell(dateRow, COL_CATEGORY, "项目", centerStyle);
-            createCell(dateRow, COL_ITEM, "", centerStyle);
-            sheet.addMergedRegion(new CellRangeAddress(2, 3, COL_CATEGORY, COL_ITEM));
+            sheet.addMergedRegion(new CellRangeAddress(2, 3, COL_CATEGORY, COL_ITEM_LAST));
             dateRow.getCell(COL_CATEGORY).setCellValue("项目");
             dateRow.getCell(COL_CATEGORY).setCellStyle(centerStyle);
             Cell dateCell = dateRow.createCell(COL_DAY_START);
             dateCell.setCellValue("日期");
             dateCell.setCellStyle(centerStyle);
             sheet.addMergedRegion(new CellRangeAddress(2, 2, COL_DAY_START, COL_DAY_END));
-            // ========== 第四行：0、1 列属 A3:B4 合并区不单独填；2-31 列为 1..30 ==========
+            // ========== 第四行：0-12 列属“项目”合并区；13-42 列为 1..30 ==========
             Row dayNumRow = sheet.createRow(rowIdx++);
             for (int d = 1; d <= 30; d++) {
                 createCell(dayNumRow, COL_DAY_START + d - 1, d <= daysInMonth ? String.valueOf(d) : "", centerStyle);
             }
 
-            // ========== 16 项点检行：最左列分类（合并）、项目名、30 日单元格 ==========
+            // ========== 16 项点检行：最左列分类（合并）、项目名（B列1-12合并）、30 日单元格 ==========
             int itemStartRow = rowIdx;
             for (int item = 0; item < 16; item++) {
                 Row row = sheet.createRow(rowIdx++);
                 createCell(row, COL_CATEGORY, CATEGORY_NAMES[item], categoryStyle);
-                createCell(row, COL_ITEM, ITEM_NAMES[item], dataStyle);
+                createCell(row, COL_ITEM_FIRST, ITEM_NAMES[item], dataStyle);
                 for (int d = 1; d <= 30; d++) {
                     EquipmentCheck rec = dayMap.get(d);
                     String symbol = getItemSymbol(rec, item);
@@ -155,6 +159,10 @@ public class EquipmentCheckExcelGenerator {
                 }
             }
             int itemEndRow = rowIdx - 1;
+            // B列：每行将 1-12 列合并为一个单元格
+            for (int r = itemStartRow; r <= itemEndRow; r++) {
+                sheet.addMergedRegion(new CellRangeAddress(r, r, COL_ITEM_FIRST, COL_ITEM_LAST));
+            }
 
             // 最左侧分类列纵向合并：电路 3、机架 3、油路 5、周边 5
             sheet.addMergedRegion(new CellRangeAddress(itemStartRow, itemStartRow + 2, COL_CATEGORY, COL_CATEGORY));
@@ -168,7 +176,7 @@ public class EquipmentCheckExcelGenerator {
             sheet.getRow(itemStartRow + 6).getCell(COL_CATEGORY).setCellValue("油路部分");
             sheet.getRow(itemStartRow + 11).getCell(COL_CATEGORY).setCellValue("周边设备");
 
-            // ========== 备注（A21:AF21 合并） ==========
+            // ========== 备注行：整行合并到 COL_DAY_END ==========
             int remarkLabelRowIdx = rowIdx++;
             Row remarkLabelRow = sheet.createRow(remarkLabelRowIdx);
             createCell(remarkLabelRow, COL_CATEGORY, "备注:", headerStyle);

@@ -14,17 +14,22 @@ import java.util.List;
  */
 public class EquipmentCheckExcelToHtmlConverter {
 
-    /** 与 Excel 默认字体一致（Calibri 11pt），使 √ × 符号显示效果与下载的 Excel 相同 */
+    /** 与 Excel 默认字体一致（Calibri 11pt），使 √ × 符号显示效果与下载的 Excel 相同；列宽、行高与 Excel 一致便于扫码预览 */
     private static final String STYLE = """
         <style>
           .ec-embed-root { font-family: Calibri, Arial, "Microsoft YaHei", SimSun, sans-serif; font-size: 11pt; }
           .ec-embed-root .ec-preview-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-          .ec-embed-root table { border-collapse: collapse; table-layout: fixed; font-size: 11pt; }
-          .ec-embed-root td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; overflow: hidden; }
+          .ec-embed-root table { border-collapse: collapse; table-layout: fixed; font-size: 11pt; width: 100%; }
+          .ec-embed-root td { border: 1px solid #000; padding: 2px 4px; vertical-align: middle; overflow: hidden; box-sizing: border-box; }
           .ec-embed-root .wrap { word-wrap: break-word; white-space: pre-wrap; }
           .ec-embed-root .center { text-align: center; }
           .ec-embed-root .left { text-align: left; }
           .ec-embed-root .right { text-align: right; }
+          .ec-embed-root tr.ec-row-title { height: 50px; }
+          .ec-embed-root tr.ec-row-header { height: 32px; }
+          .ec-embed-root tr.ec-row-data { height: 28px; }
+          .ec-embed-root tr.ec-row-remark-label { height: 100px; }
+          .ec-embed-root tr.ec-row-remark { height: 32px; }
         </style>
         """;
 
@@ -44,8 +49,8 @@ public class EquipmentCheckExcelToHtmlConverter {
         </style>
         """;
 
-    /** 点检表列数：分类(0) + 项目(1) + 30日(2-31) = 32 */
-    private static final int MAX_COLS = 32;
+    /** 点检表列数：分类(0) + 项目(1-12合并) + 30日(13-42) = 43 */
+    private static final int MAX_COLS = 43;
 
     public static String convertToHtml(InputStream inputStream) throws IOException {
         try (Workbook workbook = WorkbookFactory.create(inputStream)) {
@@ -84,6 +89,13 @@ public class EquipmentCheckExcelToHtmlConverter {
         }
 
         html.append("<div class=\"ec-preview-wrap\"><table>");
+        if (!forPdf) {
+            try {
+                appendColgroup(html, sheet);
+            } catch (Exception e) {
+                // 部分环境或旧版 Excel 列宽读取可能异常，跳过 colgroup 保证表格仍可显示
+            }
+        }
 
         int rowCount = lastRowNum + 1;
         double rowHeightPt = forPdf && rowCount > 0 ? PDF_TABLE_HEIGHT_PT / rowCount : 0;
@@ -92,6 +104,9 @@ public class EquipmentCheckExcelToHtmlConverter {
             Row row = sheet.getRow(r);
             if (forPdf && rowHeightPt > 0) {
                 html.append("<tr style=\"height:").append(String.format("%.1f", rowHeightPt)).append("pt\">");
+            } else if (!forPdf) {
+                String rowClass = getRowClass(r, lastRowNum);
+                html.append("<tr class=\"").append(rowClass).append("\">");
             } else {
                 html.append("<tr>");
             }
@@ -133,6 +148,36 @@ public class EquipmentCheckExcelToHtmlConverter {
 
         html.append("</table></div></div>");
         return html.toString();
+    }
+
+    /** Excel 列宽单位转 px：1 单位 = 1/256 字符宽，Calibri 11pt 约 (width/256)*7+12 px；单列最大 2000px 避免异常值 */
+    private static int excelWidthToPx(int excelWidth) {
+        int px = Math.max(10, (int) ((excelWidth / 256.0) * 7 + 12));
+        return Math.min(px, 2000);
+    }
+
+    private static void appendColgroup(StringBuilder html, Sheet sheet) {
+        html.append("<colgroup>");
+        for (int c = 0; c < MAX_COLS; c++) {
+            int px = 40;
+            try {
+                int w = sheet.getColumnWidth(c);
+                px = excelWidthToPx(w);
+            } catch (Exception ignored) {
+                // 单列读取失败时使用默认宽度
+            }
+            html.append("<col style=\"width:").append(px).append("px\"/>");
+        }
+        html.append("</colgroup>");
+    }
+
+    /** 与 Excel 行高一致：标题 50pt、表头 32pt、数据 28pt、备注 32pt */
+    private static String getRowClass(int rowIndex, int lastRowNum) {
+        if (rowIndex == 0) return "ec-row-title";
+        if (rowIndex >= 1 && rowIndex <= 3) return "ec-row-header";
+        if (rowIndex >= 4 && rowIndex <= 19) return "ec-row-data";
+        if (rowIndex == 20) return "ec-row-remark-label";
+        return "ec-row-remark";
     }
 
     private static CellRangeAddress findMergedRegion(List<CellRangeAddress> regions, int row, int col) {

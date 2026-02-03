@@ -8,10 +8,12 @@ import com.zssystem.mapper.EquipmentMapper;
 import com.zssystem.mapper.ProcessFileMapper;
 import com.zssystem.service.EquipmentCheckService;
 import com.zssystem.service.EquipmentQrService;
+import com.zssystem.service.HandoverRecordService;
 import com.zssystem.service.ProcessFileService;
 import com.zssystem.vo.EquipmentCheckVO;
 import com.zssystem.vo.EquipmentQrViewVO;
 import com.zssystem.util.HtmlToPdfUtil;
+import com.zssystem.util.HtmlToSvgUtil;
 import com.zssystem.util.QrCodeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +40,9 @@ public class EquipmentQrServiceImpl implements EquipmentQrService {
 
     @Autowired
     private ProcessFileService processFileService;
+
+    @Autowired
+    private HandoverRecordService handoverRecordService;
 
     @Value("${qr.frontend-base-url:http://localhost:5173}")
     private String frontendBaseUrl;
@@ -141,5 +146,30 @@ public class EquipmentQrServiceImpl implements EquipmentQrService {
         }
         String html = processFileService.getPreviewHtmlForPdf(data.getEnabledProcessFile().getId());
         return HtmlToPdfUtil.htmlToPdf(html);
+    }
+
+    @Override
+    public byte[] getCheckSvg(Long equipmentId) throws Exception {
+        EquipmentQrViewVO data = getViewData(equipmentId);
+        // 使用与下载 Excel 一致的 HTML 布局（11pt、表格结构一致），扫码预览与 Excel 一致
+        String html = equipmentCheckService.getPreviewHtml(equipmentId, data.getCheckMonth());
+        return HtmlToSvgUtil.htmlToSvg(html);
+    }
+
+    @Override
+    public byte[] getProcessFileSvg(Long equipmentId) throws Exception {
+        EquipmentQrViewVO data = getViewData(equipmentId);
+        if (data.getEnabledProcessFile() == null) {
+            throw new RuntimeException("该机台暂无启用的工艺卡");
+        }
+        String html = processFileService.getPreviewHtmlForPdf(data.getEnabledProcessFile().getId());
+        return HtmlToSvgUtil.htmlToSvg(html);
+    }
+
+    @Override
+    public byte[] getHandoverSvg(Long equipmentId, String recordMonth) throws Exception {
+        getViewData(equipmentId);
+        String html = handoverRecordService.getPreviewHtmlForSvg(equipmentId, recordMonth);
+        return HtmlToSvgUtil.htmlToSvg(html);
     }
 }

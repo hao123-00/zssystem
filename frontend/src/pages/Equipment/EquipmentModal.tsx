@@ -212,6 +212,9 @@ const EquipmentModal: React.FC<EquipmentModalProps> = ({
         <Form.Item name="spareMold3" label="备用排模3">
           <Input placeholder="请输入备用排模3" />
         </Form.Item>
+        <Form.Item name="basicMold4" label="基本排模4">
+          <Input placeholder="请输入基本排模4" />
+        </Form.Item>
         <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
           <Select placeholder="请选择状态">
             <Select.Option value={0}>停用</Select.Option>

@@ -95,6 +95,11 @@ public class SysUserServiceImpl implements SysUserService {
         user.setName(createDTO.getRealName());
         user.setEmail(createDTO.getEmail());
         user.setPhone(createDTO.getPhone());
+        user.setEmployeeNo(createDTO.getEmployeeNo());
+        user.setTeam(createDTO.getTeam());
+        user.setPosition(createDTO.getPosition());
+        user.setCategory(createDTO.getCategory());
+        user.setHireDate(createDTO.getHireDate());
         user.setStatus(createDTO.getStatus() != null ? createDTO.getStatus() : 1);
         userMapper.insert(user);
 
@@ -121,6 +126,11 @@ public class SysUserServiceImpl implements SysUserService {
         user.setName(updateDTO.getRealName());
         user.setEmail(updateDTO.getEmail());
         user.setPhone(updateDTO.getPhone());
+        user.setEmployeeNo(updateDTO.getEmployeeNo());
+        user.setTeam(updateDTO.getTeam());
+        user.setPosition(updateDTO.getPosition());
+        user.setCategory(updateDTO.getCategory());
+        user.setHireDate(updateDTO.getHireDate());
         user.setStatus(updateDTO.getStatus());
         
         // 如果提供了密码，则更新密码

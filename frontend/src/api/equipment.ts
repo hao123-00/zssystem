@@ -19,6 +19,7 @@ export interface EquipmentInfo {
   spareMold1?: string;
   spareMold2?: string;
   spareMold3?: string;
+  basicMold4?: string;
   status: number; // 0-停用，1-正常，2-维修中
   statusText?: string;
   remark?: string;
@@ -54,6 +55,7 @@ export interface EquipmentSaveParams {
   spareMold1?: string;
   spareMold2?: string;
   spareMold3?: string;
+  basicMold4?: string;
   status?: number;
   remark?: string;
 }
