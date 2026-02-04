@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Button, Space, message } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { Modal, Form, Input, InputNumber, Select, message, TimePicker } from 'antd';
 import {
   Site5sAreaInfo,
   Site5sAreaSaveParams,
-  Site5sAreaScheduleItem,
   saveSite5sArea,
   getSite5sAreaById,
+  getInjectionLeaders,
+  InjectionLeaderItem,
 } from '@/api/site5s';
+import dayjs, { Dayjs } from 'dayjs';
 
 interface AreaModalProps {
   visible: boolean;
@@ -20,9 +20,14 @@ interface AreaModalProps {
 const AreaModal: React.FC<AreaModalProps> = ({ visible, area, onCancel, onSuccess }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [leaderOptions, setLeaderOptions] = useState<InjectionLeaderItem[]>([]);
+
+  const defaultMorning = dayjs('08:00', 'HH:mm');
+  const defaultEvening = dayjs('16:00', 'HH:mm');
 
   useEffect(() => {
     if (visible) {
+      loadLeaders();
       if (area?.id) {
         loadDetail(area.id);
       } else {
@@ -30,52 +35,72 @@ const AreaModal: React.FC<AreaModalProps> = ({ visible, area, onCancel, onSucces
         form.setFieldsValue({
           sortOrder: 0,
           status: 1,
-          schedules: [
-            { slotIndex: 1, scheduledTime: '08:00', toleranceMinutes: 30 },
-            { slotIndex: 2, scheduledTime: '16:00', toleranceMinutes: 30 },
-          ],
+          morningPhotoTime: defaultMorning,
+          eveningPhotoTime: defaultEvening,
         });
       }
     }
   }, [visible, area?.id]);
 
+  const loadLeaders = async () => {
+    try {
+      const list = await getInjectionLeaders();
+      setLeaderOptions(list || []);
+    } catch {
+      setLeaderOptions([]);
+    }
+  };
+
   const loadDetail = async (id: number) => {
     try {
       const detail = await getSite5sAreaById(id);
-      const schedules = (detail.schedules || []).map((s: any) => ({
-        ...s,
-        scheduledTime: typeof s.scheduledTime === 'string' ? s.scheduledTime : (s.scheduledTime || '08:00').toString().slice(0, 5),
-      }));
+      const fmt = (t: string | undefined) => {
+        if (!t) return defaultMorning;
+        const d = dayjs(t, ['HH:mm', 'H:mm', 'HH:mm:ss']);
+        return d.isValid() ? d : defaultMorning;
+      };
+      const fmtEvening = (t: string | undefined) => {
+        if (!t) return defaultEvening;
+        const d = dayjs(t, ['HH:mm', 'H:mm', 'HH:mm:ss']);
+        return d.isValid() ? d : defaultEvening;
+      };
       form.setFieldsValue({
         ...detail,
-        schedules: schedules.length > 0 ? schedules : [
-          { slotIndex: 1, scheduledTime: '08:00', toleranceMinutes: 30 },
-          { slotIndex: 2, scheduledTime: '16:00', toleranceMinutes: 30 },
-        ],
+        morningPhotoTime: fmt(detail.morningPhotoTime),
+        eveningPhotoTime: fmtEvening(detail.eveningPhotoTime),
       });
     } catch {
-      message.error('加载区域详情失败');
+      form.setFieldsValue({ morningPhotoTime: defaultMorning, eveningPhotoTime: defaultEvening });
     }
+  };
+
+  const formatTimeValue = (value: string | Dayjs | undefined, fallback: Dayjs) => {
+    if (!value) return fallback.format('HH:mm');
+    if (dayjs.isDayjs(value)) {
+      return value.format('HH:mm');
+    }
+    const parsed = dayjs(value, ['HH:mm', 'H:mm', 'HH:mm:ss']);
+    if (parsed.isValid()) {
+      return parsed.format('HH:mm');
+    }
+    const [h = '00', m = '00'] = String(value).split(':');
+    return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const schedules: Site5sAreaScheduleItem[] = (values.schedules || []).map((s: any, idx: number) => ({
-        slotIndex: idx + 1,
-        scheduledTime: typeof s.scheduledTime === 'string' ? s.scheduledTime : (s.scheduledTime || '08:00'),
-        toleranceMinutes: s.toleranceMinutes ?? 30,
-        remark: s.remark,
-      }));
       const data: Site5sAreaSaveParams = {
         id: area?.id,
-        areaCode: values.areaCode,
         areaName: values.areaName,
-        dutyName: values.dutyName,
+        checkItem: values.checkItem,
+        responsibleUserId: values.responsibleUserId,
+        responsibleUserId2: values.responsibleUserId2,
+        morningPhotoTime: formatTimeValue(values.morningPhotoTime, defaultMorning),
+        eveningPhotoTime: formatTimeValue(values.eveningPhotoTime, defaultEvening),
         sortOrder: values.sortOrder ?? 0,
         status: values.status ?? 1,
         remark: values.remark,
-        schedules,
       };
       setLoading(true);
       await saveSite5sArea(data);
@@ -83,7 +108,6 @@ const AreaModal: React.FC<AreaModalProps> = ({ visible, area, onCancel, onSucces
       onSuccess();
     } catch (error: any) {
       if (error.errorFields) return;
-      message.error(error.message || '操作失败');
     } finally {
       setLoading(false);
     }
@@ -96,18 +120,47 @@ const AreaModal: React.FC<AreaModalProps> = ({ visible, area, onCancel, onSucces
       onOk={handleSubmit}
       onCancel={onCancel}
       confirmLoading={loading}
-      width={600}
+      width={520}
       destroyOnClose
     >
       <Form form={form} layout="vertical" preserve={false}>
-        <Form.Item name="areaCode" label="区域编码" rules={[{ required: true, message: '请输入区域编码' }]}>
-          <Input placeholder="如 AREA001" />
-        </Form.Item>
         <Form.Item name="areaName" label="区域名称" rules={[{ required: true, message: '请输入区域名称' }]}>
           <Input placeholder="如 车间A区" />
         </Form.Item>
-        <Form.Item name="dutyName" label="职能名称" rules={[{ required: true, message: '请输入职能名称' }]}>
+        <Form.Item name="checkItem" label="检查项目" rules={[{ required: true, message: '请输入检查项目' }]}>
           <Input placeholder="如 灯光管理、地面清洁" />
+        </Form.Item>
+        <Form.Item name="responsibleUserId" label="负责人1（注塑组长）" rules={[{ required: true, message: '请选择负责人1' }]}>
+          <Select
+            placeholder="请选择负责人1"
+            options={leaderOptions.map((u) => ({ value: u.id, label: `${u.name || u.username}（${u.username}）` }))}
+            allowClear
+          />
+        </Form.Item>
+        <Form.Item
+          name="responsibleUserId2"
+          label="负责人2（注塑组长）"
+          rules={[
+            { required: true, message: '请选择负责人2' },
+            ({ getFieldValue }) => ({
+              validator(_, value) {
+                if (!value || getFieldValue('responsibleUserId') !== value) return Promise.resolve();
+                return Promise.reject(new Error('负责人1与负责人2不能为同一人'));
+              },
+            }),
+          ]}
+        >
+          <Select
+            placeholder="请选择负责人2"
+            options={leaderOptions.map((u) => ({ value: u.id, label: `${u.name || u.username}（${u.username}）` }))}
+            allowClear
+          />
+        </Form.Item>
+        <Form.Item name="morningPhotoTime" label="早间拍照时间" rules={[{ required: true }]}>
+          <TimePicker format="HH:mm" style={{ width: '100%' }} minuteStep={5} />
+        </Form.Item>
+        <Form.Item name="eveningPhotoTime" label="晚间拍照时间" rules={[{ required: true }]}>
+          <TimePicker format="HH:mm" style={{ width: '100%' }} minuteStep={5} />
         </Form.Item>
         <Form.Item name="sortOrder" label="排序号">
           <InputNumber min={0} style={{ width: '100%' }} placeholder="越小越靠前" />
@@ -118,42 +171,6 @@ const AreaModal: React.FC<AreaModalProps> = ({ visible, area, onCancel, onSucces
             { value: 0, label: '停用' },
           ]} />
         </Form.Item>
-
-        <Form.Item label="拍照时段配置" required>
-          <Form.List name="schedules">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map(({ key, name, ...rest }) => (
-                  <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
-                    <Form.Item {...rest} name={[name, 'scheduledTime']} rules={[{ required: true }]}>
-                      <Input placeholder="08:00" style={{ width: 80 }} />
-                    </Form.Item>
-                    <span>±</span>
-                    <Form.Item {...rest} name={[name, 'toleranceMinutes']}>
-                      <InputNumber min={0} max={120} placeholder="30" style={{ width: 70 }} />
-                    </Form.Item>
-                    <span>分钟</span>
-                    <Form.Item {...rest} name={[name, 'remark']}>
-                      <Input placeholder="时段说明" style={{ width: 100 }} />
-                    </Form.Item>
-                    <Button type="text" danger icon={<DeleteOutlined />} onClick={() => remove(name)} />
-                  </Space>
-                ))}
-                <Form.Item>
-                  <Button
-                    type="dashed"
-                    onClick={() => add({ scheduledTime: '08:00', toleranceMinutes: 30 })}
-                    block
-                    icon={<PlusOutlined />}
-                  >
-                    添加时段
-                  </Button>
-                </Form.Item>
-              </>
-            )}
-          </Form.List>
-        </Form.Item>
-
         <Form.Item name="remark" label="备注">
           <Input.TextArea rows={2} placeholder="备注信息" />
         </Form.Item>

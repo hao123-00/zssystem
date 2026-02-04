@@ -5,16 +5,23 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zssystem.dto.Site5sAreaQueryDTO;
 import com.zssystem.dto.Site5sAreaSaveDTO;
-import com.zssystem.dto.Site5sAreaScheduleDTO;
 import com.zssystem.entity.Site5sArea;
+import com.zssystem.entity.Site5sAreaDayOff;
 import com.zssystem.entity.Site5sAreaPhoto;
 import com.zssystem.entity.Site5sAreaSchedule;
+import com.zssystem.entity.SysRole;
+import com.zssystem.entity.SysUser;
+import com.zssystem.mapper.Site5sAreaDayOffMapper;
 import com.zssystem.mapper.Site5sAreaMapper;
 import com.zssystem.mapper.Site5sAreaPhotoMapper;
 import com.zssystem.mapper.Site5sAreaScheduleMapper;
+import com.zssystem.mapper.SysRoleMapper;
+import com.zssystem.mapper.SysUserMapper;
+import com.zssystem.mapper.SysUserRoleMapper;
 import com.zssystem.service.Site5sAreaService;
 import com.zssystem.util.BeanUtil;
 import com.zssystem.util.FileUtil;
+import com.zssystem.util.SecurityUtil;
 import com.zssystem.vo.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,12 +38,18 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class Site5sAreaServiceImpl implements Site5sAreaService {
+
+    private static final int SLOT_MORNING = 1;
+    private static final int SLOT_EVENING = 2;
+    private static final int TOLERANCE_MINUTES = 30;
 
     @Autowired
     private Site5sAreaMapper areaMapper;
@@ -47,6 +60,18 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
     @Autowired
     private Site5sAreaPhotoMapper photoMapper;
 
+    @Autowired
+    private Site5sAreaDayOffMapper dayOffMapper;
+
+    @Autowired
+    private SysUserMapper userMapper;
+
+    @Autowired
+    private SysRoleMapper roleMapper;
+
+    @Autowired
+    private SysUserRoleMapper userRoleMapper;
+
     @Value("${file.upload.site5s-area-photos}")
     private String areaPhotosPath;
 
@@ -54,18 +79,16 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
     public IPage<Site5sAreaVO> getAreaList(Site5sAreaQueryDTO queryDTO) {
         Page<Site5sArea> page = new Page<>(queryDTO.getPageNum(), queryDTO.getPageSize());
         LambdaQueryWrapper<Site5sArea> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(queryDTO.getAreaCode() != null && !queryDTO.getAreaCode().isBlank(),
-                        Site5sArea::getAreaCode, queryDTO.getAreaCode())
-                .like(queryDTO.getAreaName() != null && !queryDTO.getAreaName().isBlank(),
+        wrapper.like(queryDTO.getAreaName() != null && !queryDTO.getAreaName().isBlank(),
                         Site5sArea::getAreaName, queryDTO.getAreaName())
-                .like(queryDTO.getDutyName() != null && !queryDTO.getDutyName().isBlank(),
-                        Site5sArea::getDutyName, queryDTO.getDutyName())
+                .like(queryDTO.getCheckItem() != null && !queryDTO.getCheckItem().isBlank(),
+                        Site5sArea::getCheckItem, queryDTO.getCheckItem())
                 .eq(queryDTO.getStatus() != null, Site5sArea::getStatus, queryDTO.getStatus())
                 .orderByAsc(Site5sArea::getSortOrder)
                 .orderByAsc(Site5sArea::getId);
 
         IPage<Site5sArea> areaPage = areaMapper.selectPage(page, wrapper);
-        return areaPage.convert(area -> toAreaVO(area));
+        return areaPage.convert(this::toAreaVO);
     }
 
     @Override
@@ -77,9 +100,17 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
         return toAreaVO(area);
     }
 
+    private void requireManager() {
+        boolean can = SecurityUtil.hasRoleCode("INJECTION_MANAGER") || SecurityUtil.hasRole("注塑部经理");
+        if (!can) {
+            throw new RuntimeException("仅注塑部经理可管理区域");
+        }
+    }
+
     @Override
     @Transactional
     public void saveArea(Site5sAreaSaveDTO saveDTO) {
+        requireManager();
         Site5sArea area;
         if (saveDTO.getId() != null) {
             area = areaMapper.selectById(saveDTO.getId());
@@ -88,41 +119,31 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
             }
         } else {
             area = new Site5sArea();
-            if (areaMapper.selectOne(new LambdaQueryWrapper<Site5sArea>()
-                    .eq(Site5sArea::getAreaCode, saveDTO.getAreaCode())) != null) {
-                throw new RuntimeException("区域编码已存在");
-            }
+            String areaCode = generateAreaCode();
+            area.setAreaCode(areaCode);
         }
 
-        area.setAreaCode(saveDTO.getAreaCode());
         area.setAreaName(saveDTO.getAreaName());
-        area.setDutyName(saveDTO.getDutyName());
+        area.setCheckItem(saveDTO.getCheckItem());
+        area.setResponsibleUserId(saveDTO.getResponsibleUserId());
+        area.setResponsibleUserId2(saveDTO.getResponsibleUserId2());
+        area.setMorningPhotoTime(saveDTO.getMorningPhotoTime());
+        area.setEveningPhotoTime(saveDTO.getEveningPhotoTime());
         area.setSortOrder(saveDTO.getSortOrder() != null ? saveDTO.getSortOrder() : 0);
         area.setStatus(saveDTO.getStatus() != null ? saveDTO.getStatus() : 1);
         area.setRemark(saveDTO.getRemark());
 
         if (saveDTO.getId() != null) {
             areaMapper.updateById(area);
-            scheduleMapper.delete(new LambdaQueryWrapper<Site5sAreaSchedule>()
-                    .eq(Site5sAreaSchedule::getAreaId, area.getId()));
         } else {
             areaMapper.insert(area);
-        }
-
-        for (Site5sAreaScheduleDTO sdto : saveDTO.getSchedules()) {
-            Site5sAreaSchedule s = new Site5sAreaSchedule();
-            s.setAreaId(area.getId());
-            s.setSlotIndex(sdto.getSlotIndex());
-            s.setScheduledTime(sdto.getScheduledTime());
-            s.setToleranceMinutes(sdto.getToleranceMinutes() != null ? sdto.getToleranceMinutes() : 30);
-            s.setRemark(sdto.getRemark());
-            scheduleMapper.insert(s);
         }
     }
 
     @Override
     @Transactional
     public void deleteArea(Long id) {
+        requireManager();
         Site5sArea area = areaMapper.selectById(id);
         if (area == null) {
             throw new RuntimeException("区域不存在");
@@ -133,31 +154,47 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
 
     @Override
     public AreaDailyStatusVO getTasks(LocalDate photoDate) {
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        boolean isManager = SecurityUtil.hasRoleCode("INJECTION_MANAGER") || SecurityUtil.hasRole("注塑部经理");
+
         List<Site5sArea> areas = areaMapper.selectList(
                 new LambdaQueryWrapper<Site5sArea>()
                         .eq(Site5sArea::getStatus, 1)
                         .orderByAsc(Site5sArea::getSortOrder)
                         .orderByAsc(Site5sArea::getId));
+
+        if (!isManager && currentUserId != null) {
+            areas = areas.stream()
+                    .filter(a -> currentUserId.equals(a.getResponsibleUserId()) || currentUserId.equals(a.getResponsibleUserId2()))
+                    .collect(Collectors.toList());
+        }
+
+        Set<Long> dayOffAreaIds = dayOffMapper.selectList(
+                        new LambdaQueryWrapper<Site5sAreaDayOff>()
+                                .eq(Site5sAreaDayOff::getOffDate, photoDate))
+                .stream()
+                .map(Site5sAreaDayOff::getAreaId)
+                .collect(Collectors.toSet());
+
         List<AreaTaskVO> taskList = new ArrayList<>();
         for (Site5sArea area : areas) {
-            List<Site5sAreaSchedule> schedules = scheduleMapper.selectList(
-                    new LambdaQueryWrapper<Site5sAreaSchedule>()
-                            .eq(Site5sAreaSchedule::getAreaId, area.getId())
-                            .orderByAsc(Site5sAreaSchedule::getSlotIndex));
-            if (schedules.isEmpty()) continue;
+            LocalTime morningTime = area.getMorningPhotoTime() != null ? area.getMorningPhotoTime() : LocalTime.of(8, 0);
+            LocalTime eveningTime = area.getEveningPhotoTime() != null ? area.getEveningPhotoTime() : LocalTime.of(16, 0);
 
             List<AreaTaskSlotVO> slots = new ArrayList<>();
             int completedOnTime = 0;
-            for (Site5sAreaSchedule sch : schedules) {
+
+            for (int slotIndex : new int[]{SLOT_MORNING, SLOT_EVENING}) {
+                LocalTime scheduledTime = slotIndex == SLOT_MORNING ? morningTime : eveningTime;
                 AreaTaskSlotVO slot = new AreaTaskSlotVO();
-                slot.setSlotIndex(sch.getSlotIndex());
-                slot.setScheduledTime(sch.getScheduledTime());
-                slot.setToleranceMinutes(sch.getToleranceMinutes());
+                slot.setSlotIndex(slotIndex);
+                slot.setScheduledTime(scheduledTime);
+                slot.setToleranceMinutes(TOLERANCE_MINUTES);
                 Site5sAreaPhoto photo = photoMapper.selectOne(
                         new LambdaQueryWrapper<Site5sAreaPhoto>()
                                 .eq(Site5sAreaPhoto::getAreaId, area.getId())
                                 .eq(Site5sAreaPhoto::getPhotoDate, photoDate)
-                                .eq(Site5sAreaPhoto::getSlotIndex, sch.getSlotIndex()));
+                                .eq(Site5sAreaPhoto::getSlotIndex, slotIndex));
                 if (photo != null) {
                     slot.setCompleted(true);
                     slot.setOnTime(photo.getIsOnTime() != null && photo.getIsOnTime() == 1);
@@ -165,28 +202,45 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
                     slot.setUploaderName(photo.getUploaderName());
                     slot.setUploadTimeStr(photo.getUploadTime() != null
                             ? photo.getUploadTime().format(DateTimeFormatter.ofPattern("HH:mm")) : "");
-                    if (slot.getOnTime()) completedOnTime++;
+                    if (Boolean.TRUE.equals(slot.getOnTime())) completedOnTime++;
                 } else {
                     slot.setCompleted(false);
                     slot.setOnTime(null);
                 }
                 slots.add(slot);
             }
+
+            boolean dayOff = dayOffAreaIds.contains(area.getId());
             AreaTaskVO task = new AreaTaskVO();
             task.setAreaId(area.getId());
             task.setAreaCode(area.getAreaCode());
             task.setAreaName(area.getAreaName());
-            task.setDutyName(area.getDutyName());
-            task.setTotalSlots(schedules.size());
+            task.setCheckItem(area.getCheckItem());
+            task.setResponsibleUserId(area.getResponsibleUserId());
+            task.setResponsibleUserName(getUserName(area.getResponsibleUserId()));
+            task.setResponsibleUserId2(area.getResponsibleUserId2());
+            task.setResponsibleUserName2(getUserName(area.getResponsibleUserId2()));
+            task.setTotalSlots(2);
             task.setCompletedSlots((int) slots.stream().filter(AreaTaskSlotVO::getCompleted).count());
-            task.setStatus(completedOnTime >= schedules.size() ? 1 : 0);
+            task.setDayOff(dayOff);
+            task.setStatus(dayOff ? 2 : (completedOnTime >= 2 ? 1 : 0));
             task.setSlots(slots);
             taskList.add(task);
         }
+
         AreaDailyStatusVO vo = new AreaDailyStatusVO();
         vo.setStatusDate(photoDate);
         vo.setAreas(taskList);
         return vo;
+    }
+
+    @Override
+    public List<AreaDailyStatusVO> getTasksRange(LocalDate startDate, LocalDate endDate) {
+        List<AreaDailyStatusVO> result = new ArrayList<>();
+        for (LocalDate d = startDate; !d.isAfter(endDate); d = d.plusDays(1)) {
+            result.add(getTasks(d));
+        }
+        return result;
     }
 
     @Override
@@ -200,6 +254,10 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new RuntimeException("只能上传图片格式");
         }
+        if (slotIndex != SLOT_MORNING && slotIndex != SLOT_EVENING) {
+            throw new RuntimeException("时段参数错误");
+        }
+
         Site5sArea area = areaMapper.selectById(areaId);
         if (area == null) {
             throw new RuntimeException("区域不存在");
@@ -207,13 +265,15 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
         if (!Integer.valueOf(1).equals(area.getStatus())) {
             throw new RuntimeException("该区域已停用");
         }
-        Site5sAreaSchedule schedule = scheduleMapper.selectOne(
-                new LambdaQueryWrapper<Site5sAreaSchedule>()
-                        .eq(Site5sAreaSchedule::getAreaId, areaId)
-                        .eq(Site5sAreaSchedule::getSlotIndex, slotIndex));
-        if (schedule == null) {
-            throw new RuntimeException("该区域不存在该时段配置");
+
+        Long currentUserId = SecurityUtil.getCurrentUserId();
+        boolean isManager = SecurityUtil.hasRoleCode("INJECTION_MANAGER") || SecurityUtil.hasRole("注塑部经理");
+        boolean isResponsible = currentUserId != null
+                && (currentUserId.equals(area.getResponsibleUserId()) || currentUserId.equals(area.getResponsibleUserId2()));
+        if (!isManager && !isResponsible) {
+            throw new RuntimeException("您不是该区域负责人，无法上传照片");
         }
+
         Site5sAreaPhoto existing = photoMapper.selectOne(
                 new LambdaQueryWrapper<Site5sAreaPhoto>()
                         .eq(Site5sAreaPhoto::getAreaId, areaId)
@@ -237,12 +297,13 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
             throw new RuntimeException("照片保存失败: " + e.getMessage());
         }
 
+        LocalTime scheduledTime = slotIndex == SLOT_MORNING
+                ? (area.getMorningPhotoTime() != null ? area.getMorningPhotoTime() : LocalTime.of(8, 0))
+                : (area.getEveningPhotoTime() != null ? area.getEveningPhotoTime() : LocalTime.of(16, 0));
         LocalDateTime uploadTime = LocalDateTime.now();
-        LocalTime scheduledTime = schedule.getScheduledTime();
-        int tolerance = schedule.getToleranceMinutes() != null ? schedule.getToleranceMinutes() : 30;
         LocalTime uploadTimeOnly = uploadTime.toLocalTime();
-        LocalTime start = scheduledTime.minusMinutes(tolerance);
-        LocalTime end = scheduledTime.plusMinutes(tolerance);
+        LocalTime start = scheduledTime.minusMinutes(TOLERANCE_MINUTES);
+        LocalTime end = scheduledTime.plusMinutes(TOLERANCE_MINUTES);
         boolean onTime = !uploadTimeOnly.isBefore(start) && !uploadTimeOnly.isAfter(end);
 
         Site5sAreaPhoto photo = new Site5sAreaPhoto();
@@ -254,7 +315,11 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
         photo.setUploaderName(uploaderName);
         photo.setUploadTime(uploadTime);
         photo.setIsOnTime(onTime ? 1 : 0);
-        photoMapper.insert(photo);
+        try {
+            photoMapper.insert(photo);
+        } catch (DuplicateKeyException e) {
+            throw new RuntimeException("该区域该时段已上传过照片");
+        }
         return photo.getId();
     }
 
@@ -275,7 +340,7 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
             Site5sArea a = areaMapper.selectById(p.getAreaId());
             if (a != null) {
                 vo.setAreaName(a.getAreaName());
-                vo.setDutyName(a.getDutyName());
+                vo.setCheckItem(a.getCheckItem());
             }
             return vo;
         });
@@ -298,15 +363,140 @@ public class Site5sAreaServiceImpl implements Site5sAreaService {
         }
     }
 
+    @Override
+    @Transactional
+    public void deletePhoto(Long photoId, Long currentUserId) {
+        Site5sAreaPhoto photo = photoMapper.selectById(photoId);
+        if (photo == null) {
+            throw new RuntimeException("拍照记录不存在");
+        }
+        Site5sArea area = areaMapper.selectById(photo.getAreaId());
+        if (area == null) {
+            throw new RuntimeException("区域不存在");
+        }
+        boolean isManager = SecurityUtil.hasRoleCode("INJECTION_MANAGER") || SecurityUtil.hasRole("注塑部经理");
+        boolean isResponsible = currentUserId != null
+                && (currentUserId.equals(area.getResponsibleUserId()) || currentUserId.equals(area.getResponsibleUserId2()));
+        if (!isManager && !isResponsible) {
+            throw new RuntimeException("您不是该区域负责人，无法删除拍照记录");
+        }
+        String path = photo.getPhotoPath();
+        if (path != null && !path.isBlank()) {
+            try {
+                Files.deleteIfExists(Paths.get(path));
+            } catch (Exception e) {
+                throw new RuntimeException("删除照片文件失败");
+            }
+        }
+        photoMapper.deleteByIdPhysical(photoId);
+    }
+
+    @Override
+    @Transactional
+    public void deletePhotosByAreaAndDate(Long areaId, LocalDate photoDate, Long currentUserId) {
+        Site5sArea area = areaMapper.selectById(areaId);
+        if (area == null) {
+            throw new RuntimeException("区域不存在");
+        }
+        boolean isManager = SecurityUtil.hasRoleCode("INJECTION_MANAGER") || SecurityUtil.hasRole("注塑部经理");
+        boolean isResponsible = currentUserId != null
+                && (currentUserId.equals(area.getResponsibleUserId()) || currentUserId.equals(area.getResponsibleUserId2()));
+        if (!isManager && !isResponsible) {
+            throw new RuntimeException("您不是该区域负责人，无法删除拍照记录");
+        }
+        List<Site5sAreaPhoto> list = photoMapper.selectList(
+                new LambdaQueryWrapper<Site5sAreaPhoto>()
+                        .eq(Site5sAreaPhoto::getAreaId, areaId)
+                        .eq(Site5sAreaPhoto::getPhotoDate, photoDate));
+        for (Site5sAreaPhoto photo : list) {
+            String path = photo.getPhotoPath();
+            if (path != null && !path.isBlank()) {
+                try {
+                    Files.deleteIfExists(Paths.get(path));
+                } catch (Exception ignored) {
+                }
+            }
+            photoMapper.deleteByIdPhysical(photo.getId());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void setDayOff(Long areaId, LocalDate photoDate, boolean dayOff) {
+        Site5sArea area = areaMapper.selectById(areaId);
+        if (area == null) {
+            throw new RuntimeException("区域不存在");
+        }
+        if (dayOff) {
+            long cnt = dayOffMapper.selectCount(
+                    new LambdaQueryWrapper<Site5sAreaDayOff>()
+                            .eq(Site5sAreaDayOff::getAreaId, areaId)
+                            .eq(Site5sAreaDayOff::getOffDate, photoDate));
+            if (cnt == 0) {
+                Site5sAreaDayOff record = new Site5sAreaDayOff();
+                record.setAreaId(areaId);
+                record.setOffDate(photoDate);
+                dayOffMapper.insert(record);
+            }
+        } else {
+            dayOffMapper.delete(
+                    new LambdaQueryWrapper<Site5sAreaDayOff>()
+                            .eq(Site5sAreaDayOff::getAreaId, areaId)
+                            .eq(Site5sAreaDayOff::getOffDate, photoDate));
+        }
+    }
+
+    @Override
+    public LightingStatsVO getLightingStats() {
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = today.withDayOfMonth(1);
+        int days = (int) ChronoUnit.DAYS.between(monthStart, today) + 1;
+        long completionCount = photoMapper.selectCount(
+                new LambdaQueryWrapper<Site5sAreaPhoto>()
+                        .ge(Site5sAreaPhoto::getPhotoDate, monthStart)
+                        .le(Site5sAreaPhoto::getPhotoDate, today)
+                        .eq(Site5sAreaPhoto::getIsOnTime, 1));
+        long areaCount = areaMapper.selectCount(
+                new LambdaQueryWrapper<Site5sArea>().eq(Site5sArea::getStatus, 1));
+        long dayOffCount = dayOffMapper.selectCount(
+                new LambdaQueryWrapper<Site5sAreaDayOff>()
+                        .ge(Site5sAreaDayOff::getOffDate, monthStart)
+                        .le(Site5sAreaDayOff::getOffDate, today));
+        double totalSlots = 2.0 * (areaCount * days - dayOffCount);
+        double completionRate = totalSlots > 0 ? (completionCount / totalSlots) : 0.0;
+        LightingStatsVO vo = new LightingStatsVO();
+        vo.setCompletionCount((int) completionCount);
+        vo.setDays(days);
+        vo.setCompletionRate(completionRate);
+        return vo;
+    }
+
+    @Override
+    public List<SysUser> getInjectionLeaders() {
+        SysRole role = roleMapper.selectByRoleCode("INJECTION_LEADER");
+        if (role == null) return List.of();
+        List<Long> userIds = userRoleMapper.selectUserIdsByRoleId(role.getId());
+        if (userIds == null || userIds.isEmpty()) return List.of();
+        return userMapper.selectBatchIds(userIds).stream()
+                .filter(u -> u.getStatus() != null && u.getStatus() == 1)
+                .collect(Collectors.toList());
+    }
+
+    private String generateAreaCode() {
+        long count = areaMapper.selectCount(null);
+        return String.format("AREA%03d", count + 1);
+    }
+
+    private String getUserName(Long userId) {
+        if (userId == null) return null;
+        SysUser u = userMapper.selectById(userId);
+        return u != null ? u.getName() : null;
+    }
+
     private Site5sAreaVO toAreaVO(Site5sArea area) {
         Site5sAreaVO vo = BeanUtil.copyProperties(area, Site5sAreaVO.class);
-        List<Site5sAreaSchedule> schedules = scheduleMapper.selectList(
-                new LambdaQueryWrapper<Site5sAreaSchedule>()
-                        .eq(Site5sAreaSchedule::getAreaId, area.getId())
-                        .orderByAsc(Site5sAreaSchedule::getSlotIndex));
-        vo.setSchedules(schedules.stream()
-                .map(s -> BeanUtil.copyProperties(s, Site5sAreaScheduleVO.class))
-                .collect(Collectors.toList()));
+        vo.setResponsibleUserName(getUserName(area.getResponsibleUserId()));
+        vo.setResponsibleUserName2(getUserName(area.getResponsibleUserId2()));
         return vo;
     }
 }

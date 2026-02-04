@@ -133,29 +133,31 @@ export const createRectificationFromCheck = (checkId: number) => {
 };
 
 // ========== 5S区域管理 ==========
-export interface Site5sAreaScheduleItem {
-  id?: number;
-  slotIndex: number;
-  scheduledTime: string;  // "HH:mm"
-  toleranceMinutes?: number;
-  remark?: string;
+export interface InjectionLeaderItem {
+  id: number;
+  name: string;
+  username?: string;
 }
 
 export interface Site5sAreaInfo {
   id?: number;
   areaCode?: string;
   areaName?: string;
-  dutyName?: string;
+  checkItem?: string;
+  responsibleUserId?: number;
+  responsibleUserName?: string;
+  responsibleUserId2?: number;
+  responsibleUserName2?: string;
+  morningPhotoTime?: string;
+  eveningPhotoTime?: string;
   sortOrder?: number;
   status?: number;
   remark?: string;
-  schedules?: Site5sAreaScheduleItem[];
 }
 
 export interface Site5sAreaQueryParams {
-  areaCode?: string;
   areaName?: string;
-  dutyName?: string;
+  checkItem?: string;
   status?: number;
   pageNum?: number;
   pageSize?: number;
@@ -163,13 +165,15 @@ export interface Site5sAreaQueryParams {
 
 export interface Site5sAreaSaveParams {
   id?: number;
-  areaCode: string;
   areaName: string;
-  dutyName: string;
+  checkItem: string;
+  responsibleUserId: number;
+  responsibleUserId2: number;
+  morningPhotoTime: string;  // "HH:mm"
+  eveningPhotoTime: string;  // "HH:mm"
   sortOrder?: number;
   status?: number;
   remark?: string;
-  schedules: Site5sAreaScheduleItem[];
 }
 
 export interface AreaTaskSlot {
@@ -187,10 +191,15 @@ export interface AreaTask {
   areaId: number;
   areaCode: string;
   areaName: string;
-  dutyName: string;
+  checkItem: string;
+  responsibleUserId?: number;
+  responsibleUserName?: string;
+  responsibleUserId2?: number;
+  responsibleUserName2?: string;
   totalSlots: number;
   completedSlots: number;
-  status: number;  // 0-异常，1-正常
+  status: number;  // 0-异常，1-正常，2-放假
+  dayOff?: boolean;
   slots: AreaTaskSlot[];
 }
 
@@ -216,10 +225,38 @@ export const deleteSite5sArea = (id: number) => {
   return request.delete(`/site5s/area/${id}`);
 };
 
+/** 获取注塑组长列表（用于负责人选择） */
+export const getInjectionLeaders = () => {
+  return request.get<InjectionLeaderItem[]>('/site5s/area/injection-leaders');
+};
+
+/** 当前用户是否可管理区域（仅注塑部经理） */
+export const getAreaCanManage = () => {
+  return request.get<boolean>('/site5s/area/can-manage');
+};
+
 // 拍照任务
 export const getSite5sAreaTasks = (photoDate: string) => {
   return request.get('/site5s/area/tasks', { params: { photoDate } });
 };
+
+/** 获取日期范围内的拍照任务（按日期每天一条记录） */
+export const getSite5sAreaTasksRange = (startDate: string, endDate: string) => {
+  return request.get<AreaDailyStatus[]>('/site5s/area/tasks-range', { params: { startDate, endDate } });
+};
+
+/** 设置/取消区域某日放假（仅注塑部经理） */
+export const setSite5sAreaDayOff = (areaId: number, photoDate: string, dayOff: boolean) => {
+  return request.post('/site5s/area/set-day-off', null, { params: { areaId, photoDate, dayOff } });
+};
+
+/** 灯光管理示意图：本月至今完成次数、拍照完成率 */
+export interface LightingStats {
+  completionCount: number;
+  days: number;
+  completionRate: number;
+}
+export const getLightingStats = () => request.get<LightingStats>('/site5s/area/lighting-stats');
 
 // 上传照片
 export const uploadSite5sAreaPhoto = (
@@ -251,4 +288,14 @@ export const getSite5sAreaPhotoRecords = (params: {
 export const getSite5sAreaPhotoBlob = async (id: number): Promise<Blob> => {
   const res = await request.get(`/site5s/area/photo/${id}`, { responseType: 'blob' });
   return (res as { data?: Blob })?.data ?? (res as unknown as Blob);
+};
+
+/** 删除拍照记录（单条） */
+export const deleteSite5sAreaPhoto = (id: number) => {
+  return request.delete(`/site5s/area/photo/${id}`);
+};
+
+/** 删除区域某日全部拍照记录（早间+晚间），删除后可重新上传 */
+export const deleteSite5sAreaPhotosByDay = (areaId: number, photoDate: string) => {
+  return request.delete('/site5s/area/photo-by-day', { params: { areaId, photoDate } });
 };

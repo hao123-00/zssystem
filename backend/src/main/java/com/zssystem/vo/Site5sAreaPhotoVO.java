@@ -10,7 +10,7 @@ public class Site5sAreaPhotoVO {
     private Long id;
     private Long areaId;
     private String areaName;
-    private String dutyName;
+    private String checkItem;
     private LocalDate photoDate;
     private Integer slotIndex;
     private String photoPath;

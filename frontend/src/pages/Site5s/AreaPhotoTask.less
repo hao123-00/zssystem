@@ -13,20 +13,47 @@
   }
 
   .area-card {
+    .daily-records {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .daily-record {
+      border: 1px solid #f0f0f0;
+      border-radius: 6px;
+      padding: 12px;
+      background: #fafafa;
+    }
+
+    .daily-record-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+
+      .daily-date {
+        font-weight: 600;
+        color: #333;
+      }
+    }
+
     .area-slots {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 12px;
     }
 
     .area-slot {
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 10px 14px;
       border: 1px dashed #d9d9d9;
       border-radius: 4px;
       background: #fafafa;
+      min-height: 48px;
 
       &.area-slot-done {
         border-style: solid;

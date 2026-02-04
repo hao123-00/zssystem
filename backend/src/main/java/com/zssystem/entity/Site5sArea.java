@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
 @TableName("site_5s_area")
@@ -17,8 +18,20 @@ public class Site5sArea {
     @TableField("area_name")
     private String areaName;
 
-    @TableField("duty_name")
-    private String dutyName;
+    @TableField("check_item")
+    private String checkItem;
+
+    @TableField("responsible_user_id")
+    private Long responsibleUserId;
+
+    @TableField("responsible_user_id_2")
+    private Long responsibleUserId2;
+
+    @TableField("morning_photo_time")
+    private LocalTime morningPhotoTime;
+
+    @TableField("evening_photo_time")
+    private LocalTime eveningPhotoTime;
 
     @TableField("sort_order")
     private Integer sortOrder;
